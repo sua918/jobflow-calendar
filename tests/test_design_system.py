@@ -8,13 +8,6 @@ import yaml
 from jobflow.ui import APP_CSS
 
 ROOT = Path(__file__).resolve().parents[1]
-IMPLEMENTED_BASELINE_TOKENS = {
-    "--jf-ink": "#0F172A",
-    "--jf-primary": "#4F46E5",
-    "--jf-deadline": "#0072B2",
-    "--jf-routine": "#009E73",
-    "--jf-warning": "#D55E00",
-}
 CALENDAR_FIRST_TOKENS = {
     "primary": "#2563EB",
     "canvas": "#F7F8FA",
@@ -91,9 +84,92 @@ def test_calendar_first_contract_requires_one_sidebar_path_without_layout_fallba
     assert "There is no approved inline-panel or custom-modal fallback" in ux_contract
 
 
-def test_current_css_palette_stays_guarded_until_redesign_implementation() -> None:
-    for token, value in IMPLEMENTED_BASELINE_TOKENS.items():
+def test_implemented_css_uses_calendar_first_palette_and_font_stack() -> None:
+    expected = {
+        "--jf-ink": "#18181B",
+        "--jf-muted": "#52525B",
+        "--jf-border": "#D4D4D8",
+        "--jf-border-strong": "#71717A",
+        "--jf-canvas": "#F7F8FA",
+        "--jf-primary": "#2563EB",
+        "--jf-focus": "#1D4ED8",
+    }
+    for token, value in expected.items():
         assert re.search(rf"{re.escape(token)}:\s*{value}", APP_CSS, re.IGNORECASE)
+    assert re.search(
+        r"\.jf-app[^{}]*\{[^{}]*font-family:\s*Pretendard,\s*\"Pretendard Variable\"",
+        APP_CSS,
+        re.DOTALL,
+    )
+
+
+def test_css_scopes_square_choice_controls_without_global_input_sizing() -> None:
+    selector = (
+        '.jf-app :where(.jf-checkbox, .jf-radio) '
+        'input:is([type="checkbox"], [type="radio"])'
+    )
+    assert selector in APP_CSS
+    square_rule = re.search(rf"{re.escape(selector)}\s*\{{([^}}]+)\}}", APP_CSS)
+    assert square_rule is not None
+    declarations = square_rule.group(1)
+    for declaration in (
+        "width: 18px",
+        "height: 18px",
+        "min-width: 18px",
+        "max-width: 18px",
+        "min-height: 18px",
+        "max-height: 18px",
+        "aspect-ratio: 1 / 1",
+    ):
+        assert declaration in declarations
+    assert re.search(r"(^|[},])\s*input\s*\{", APP_CSS) is None
+
+
+def test_css_encodes_calendar_first_desktop_and_mobile_geometry() -> None:
+    assert re.search(r"#jf-topbar\s*\{[^}]*height:\s*64px", APP_CSS, re.DOTALL)
+    assert re.search(
+        r"#jf-calendar-workspace\s*\{[^}]*min-height:\s*824px", APP_CSS, re.DOTALL
+    )
+    assert re.search(
+        r"#jf-compose-panel\s*\{[^}]*position:\s*fixed[^}]*width:\s*440px",
+        APP_CSS,
+        re.DOTALL,
+    )
+    mobile = APP_CSS[APP_CSS.index("@media (max-width: 700px)") :]
+    assert re.search(r"#jf-topbar\s*\{[^}]*height:\s*104px", mobile, re.DOTALL)
+    assert re.search(
+        r"#jf-compose-panel\s*\{[^}]*inset:\s*0[^}]*width:\s*100dvw",
+        mobile,
+        re.DOTALL,
+    )
+    mobile_calendar = re.search(r"\.calendar-shell\s*\{([^}]+)\}", mobile)
+    assert mobile_calendar is not None
+    assert "height: calc(100dvh - 116px)" in mobile_calendar.group(1)
+    assert "height: auto" not in mobile_calendar.group(1)
+
+
+def test_css_keeps_topbar_and_sticky_footer_controls_on_one_row() -> None:
+    button_rule = re.search(
+        r"\.jf-app \.jf-button button, \.jf-app button\.jf-button\s*\{([^}]+)\}",
+        APP_CSS,
+    )
+    assert button_rule is not None
+    assert "white-space: nowrap" in button_rule.group(1)
+    assert re.search(
+        r"\.jf-month-controls\s*\{[^}]*flex-wrap:\s*nowrap",
+        APP_CSS,
+        re.DOTALL,
+    )
+    footer = re.search(r"\.jf-panel-footer\s*\{([^}]+)\}", APP_CSS)
+    assert footer is not None
+    declarations = footer.group(1)
+    assert "height: 64px" in declarations
+    assert "flex-wrap: nowrap" in declarations
+    assert re.search(
+        r"#jf-compose-close\s*\{[^}]*width:\s*40px[^}]*min-width:\s*40px",
+        APP_CSS,
+        re.DOTALL,
+    )
 
 
 def test_required_text_and_surface_pairs_meet_wcag_aa() -> None:

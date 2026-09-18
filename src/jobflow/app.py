@@ -6,7 +6,7 @@ from pathlib import Path
 import gradio as gr
 from dotenv import load_dotenv
 
-from jobflow.ui import APP_CSS, build_blocks
+from jobflow.ui import APP_CSS, APP_JS, build_blocks
 
 
 def build_app() -> gr.Blocks:
@@ -17,7 +17,7 @@ def build_app() -> gr.Blocks:
 
 def main() -> None:
     app = build_app()
-    app.launch(server_name="127.0.0.1", css=APP_CSS)
+    app.launch(server_name="127.0.0.1", css=APP_CSS, js=APP_JS)
 
 
 if __name__ == "__main__":

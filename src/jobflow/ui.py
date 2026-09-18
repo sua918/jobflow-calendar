@@ -116,83 +116,336 @@ CATEGORY_ICONS = {
 
 APP_CSS = """
 :root {
-  --jf-ink: #0F172A; --jf-muted: #475569; --jf-border: #CBD5E1;
-  --jf-surface: #FFFFFF; --jf-surface-soft: #F8FAFC; --jf-primary: #4F46E5;
-  --jf-focus: #4F46E5; --jf-deadline: #0072B2; --jf-deadline-bg: #E6F4FB;
-  --jf-routine: #009E73; --jf-routine-bg: #E7F6F1;
-  --jf-fixed: #9A6700; --jf-fixed-bg: #FFF4D6;
-  --jf-warning: #D55E00; --jf-warning-bg: #FDECE7;
-  --jf-radius: 10px;
+  --jf-ink: #18181B; --jf-muted: #52525B; --jf-border: #D4D4D8;
+  --jf-border-strong: #71717A; --jf-canvas: #F7F8FA; --jf-surface: #FFFFFF;
+  --jf-surface-soft: #FAFAFA; --jf-primary: #2563EB; --jf-primary-hover: #1D4ED8;
+  --jf-focus: #1D4ED8; --jf-deadline: #2563EB; --jf-deadline-bg: #EFF6FF;
+  --jf-routine: #047857; --jf-routine-bg: #ECFDF5;
+  --jf-fixed: #A16207; --jf-fixed-bg: #FFFBEB;
+  --jf-warning: #92400E; --jf-warning-bg: #FFFBEB;
+  --jf-danger: #B42318; --jf-danger-bg: #FEF3F2;
 }
-.gradio-container { color: var(--jf-ink) !important;
-  background: var(--jf-surface-soft) !important; }
-.jf-hero { padding: 1.25rem 1.5rem; border: 1px solid var(--jf-border); border-radius: 16px;
-  background: var(--jf-surface); box-shadow: 0 8px 24px rgba(15, 23, 42, .06); }
-.jf-hero h1 { margin: 0 0 .35rem; color: var(--jf-ink); letter-spacing: -.02em; }
-button.primary { background: var(--jf-primary) !important; color: #FFF !important; }
-button, input, textarea, [role="tab"], summary { min-height: 44px; }
-button:disabled { opacity: .55; cursor: not-allowed; }
-[role="tab"][aria-selected="true"] { color: var(--jf-primary) !important;
-  border-bottom: 3px solid var(--jf-primary) !important; font-weight: 800; }
-.warning-panel { border-left: 4px solid var(--jf-warning) !important;
-  background: var(--jf-warning-bg) !important; }
-:where(button, input, textarea, [role="tab"], summary, .calendar-event):focus-visible {
-  outline: 3px solid var(--jf-focus) !important; outline-offset: 2px;
+html, body { margin: 0; background: var(--jf-canvas); overflow-x: hidden; }
+.gradio-container { max-width: none !important; padding: 0 !important; }
+.jf-app, .jf-app button, .jf-app textarea, .jf-app input, .jf-app table {
+  font-family: Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
 }
-.calendar-shell { color: var(--jf-ink); background: var(--jf-surface);
-  border: 1px solid var(--jf-border);
-  border-radius: 14px; overflow: hidden; }
-.calendar-title { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
-  padding: 1rem 1.25rem; border-bottom: 1px solid var(--jf-border); }
+#jf-page-content { width: calc(100% + 64px) !important; max-width: 1600px !important;
+  margin: -16px -32px 0 !important;
+  padding: 0 24px 24px !important; gap: 16px !important; color: var(--jf-ink) !important;
+  background: var(--jf-canvas) !important; }
+.jf-app .jf-button button, .jf-app button.jf-button { min-height: 40px; border-radius: 8px;
+  white-space: nowrap; }
+.jf-app button.primary { background: var(--jf-primary) !important; color: #FFF !important;
+  border-color: var(--jf-primary) !important; }
+.jf-app button.primary:hover { background: var(--jf-primary-hover) !important; }
+.jf-app button:disabled { opacity: 1; color: var(--jf-muted); background: #F4F4F5;
+  cursor: not-allowed; }
+.jf-app :where(.jf-checkbox, .jf-radio) { min-height: 44px; display: flex;
+  align-items: center; }
+.jf-app :where(.jf-checkbox, .jf-radio) input:is([type="checkbox"], [type="radio"]) {
+  width: 18px; height: 18px; min-width: 18px; max-width: 18px;
+  min-height: 18px; max-height: 18px; aspect-ratio: 1 / 1;
+}
+.jf-app :where(button, textarea, input:not([type="checkbox"]):not([type="radio"]),
+  summary, .calendar-event):focus-visible {
+  outline: 2px solid var(--jf-focus) !important; outline-offset: 2px;
+}
+#jf-skip-link { position: fixed; left: 12px; top: -80px; z-index: 1001; padding: 10px 14px;
+  background: var(--jf-surface); color: var(--jf-primary); }
+#jf-skip-link:focus { top: 8px; }
+#jf-topbar { height: 64px; display: grid; grid-template-columns: 112px 176px 80px 1fr 112px;
+  align-items: center; gap: 16px; border-bottom: 1px solid var(--jf-border);
+  background: var(--jf-surface); }
+#jf-topbar > * { min-width: 0 !important; margin: 0 !important; align-self: center; }
+#jf-topbar > .block { height: 40px !important; padding: 0 !important; align-content: center; }
+.jf-brand { margin: 0; font-size: 18px; font-weight: 700; }
+.jf-month-controls { height: 40px !important; min-height: 40px !important; display: flex;
+  flex-wrap: nowrap !important; align-items: center; gap: 8px; overflow: visible !important; }
+#jf-month-prev, #jf-month-next { width: 40px; min-width: 40px; flex: 0 0 40px; }
+#jf-month-current { width: 80px; min-width: 80px; flex: 0 0 80px; }
+#jf-topbar > .form { grid-column: 3; height: 40px !important; min-width: 80px !important; }
+#jf-selected-month { min-width: 80px; height: 40px; padding: 0 !important;
+  font-variant-numeric: tabular-nums; }
+#jf-selected-month label, #jf-selected-month .input-container { height: 40px !important; }
+#jf-selected-month textarea { height: 40px !important; min-height: 40px !important;
+  max-height: 40px !important; padding: 9px 4px !important; overflow: hidden !important;
+  resize: none; white-space: nowrap; text-align: center; border: 0 !important;
+  background: transparent !important; font-weight: 700; box-shadow: none !important; }
+#jf-create-schedule { grid-column: 5; }
+#jf-calendar-workspace { min-height: 824px; width: 100%; padding: 0 !important;
+  gap: 0 !important; }
+#jf-calendar-workspace > div { padding: 0 !important; margin: 0 !important; }
+#jf-calendar-workspace .calendar-shell { width: calc(100% + 24px); margin: -10px -12px; }
+.calendar-shell { height: 824px; min-height: 824px; display: flex; flex-direction: column;
+  color: var(--jf-ink);
+  background: var(--jf-surface); border: 1px solid var(--jf-border); border-radius: 12px;
+  overflow: auto; }
+.calendar-title { min-height: 56px; display: flex; align-items: center;
+  justify-content: space-between; gap: 16px; padding: 0 16px;
+  border-bottom: 1px solid var(--jf-border); }
 .calendar-title h3, .calendar-title p { margin: 0; }
-.calendar-title p { color: var(--jf-muted); }
+.calendar-title h3 { font-size: 24px; line-height: 1.25; }
+.calendar-title p { color: var(--jf-muted); font-size: 13px; }
 .calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.calendar-weekday { padding: .65rem; text-align: center; font-weight: 700; color: var(--jf-muted);
-  background: var(--jf-surface-soft); border-bottom: 1px solid var(--jf-border); }
-.calendar-day { min-width: 0; min-height: 136px; padding: .5rem;
+.calendar-weekday { height: 36px; display: grid; place-items: center; font-size: 13px;
+  font-weight: 600; color: var(--jf-muted); background: var(--jf-surface-soft);
+  border-bottom: 1px solid var(--jf-border); }
+.calendar-day { min-width: 0; min-height: 112px; padding: 8px;
   border-right: 1px solid var(--jf-border);
   border-bottom: 1px solid var(--jf-border); background: var(--jf-surface); }
 .calendar-day:nth-child(7n) { border-right: 0; }
-.calendar-day:hover { background: #F1F5F9; }
-.calendar-day.outside-month { color: #64748B; background: #F8FAFC; }
-.calendar-day.today { box-shadow: inset 0 0 0 3px var(--jf-primary); }
-.day-number { display: inline-flex; align-items: center; justify-content: center; min-width: 28px;
-  min-height: 28px; font-weight: 700; }
-.today .day-number { border-radius: 999px; background: var(--jf-primary); color: #FFF; }
-.day-events { display: grid; gap: .35rem; margin-top: .35rem; }
-.calendar-event { display: grid; min-width: 0; padding: .38rem .45rem; border: 1px solid;
-  border-left-width: 4px; border-radius: 7px; line-height: 1.25; cursor: default; }
+.calendar-day:hover { background: var(--jf-surface-soft); }
+.calendar-day.outside-month { color: #71717A; background: var(--jf-surface-soft); }
+.calendar-day.today { box-shadow: inset 0 0 0 2px #1E3A8A; background: #DBEAFE; }
+.day-number { display: inline-flex; align-items: center; justify-content: center; min-width: 24px;
+  min-height: 24px; font-size: 13px; font-weight: 600; }
+.day-events { display: grid; gap: 6px; margin-top: 4px; }
+.calendar-event { display: grid; min-width: 0; min-height: 24px; padding: 4px 6px;
+  border-left: 3px solid; border-radius: 6px; line-height: 1.25; cursor: default; }
 .calendar-event.deadline_task { border-color: var(--jf-deadline);
   background: var(--jf-deadline-bg); }
 .calendar-event.recurring_routine { border-color: var(--jf-routine);
   background: var(--jf-routine-bg); }
 .calendar-event.fixed_event { border-color: var(--jf-fixed); background: var(--jf-fixed-bg); }
-.category-label { font-size: .72rem; font-weight: 800; }
-.event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
-.calendar-event time { color: var(--jf-muted); font-size: .76rem; }
+.category-label { font-size: 11px; font-weight: 600; }
+.event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; font-weight: 600; }
+.calendar-event time { color: var(--jf-muted); font-size: 12px; }
 .calendar-overflow summary { display: flex; align-items: center;
-  color: var(--jf-primary); font-weight: 700;
-  cursor: pointer; }
-.empty-day { color: var(--jf-muted); font-size: .78rem; }
-.calendar-empty, .calendar-loading { display: grid; place-items: center;
-  min-height: 220px; padding: 2rem; color: var(--jf-muted);
-  background: var(--jf-surface); border: 1px dashed var(--jf-border);
-  border-radius: 14px; }
-.calendar-loading { background: linear-gradient(90deg, #F8FAFC, #EEF2FF, #F8FAFC); }
+  min-height: 32px; color: var(--jf-primary); font-size: 12px; font-weight: 600; cursor: pointer; }
+.calendar-empty, .calendar-loading { flex: 1; display: grid; place-items: center;
+  align-content: center; gap: 8px; min-height: 730px; padding: 32px; color: var(--jf-muted);
+  background: var(--jf-surface); text-align: center; }
+.calendar-empty h4, .calendar-empty p { margin: 0; }
+.calendar-empty h4 { color: var(--jf-ink); font-size: 18px; }
+.calendar-loading { background: var(--jf-surface); }
+.jf-secondary { margin-top: 12px; background: var(--jf-surface); border-radius: 8px; }
+.jf-secondary > summary { min-height: 44px; display: flex; align-items: center; padding: 0 12px;
+  color: var(--jf-ink); font-weight: 600; cursor: pointer; border-bottom: 1px solid transparent; }
+.jf-secondary[open] > summary { border-bottom-color: var(--jf-border); }
+.jf-details-body { max-height: 440px; overflow: auto; padding: 12px; }
+#jf-schedule-details-body, #jf-unplaced-details-body { display: none !important; }
+#jf-schedule-details-body.jf-details-expanded,
+#jf-unplaced-details-body.jf-details-expanded { display: flex !important; }
+#jf-compose-panel { position: fixed !important; top: 0 !important; right: -440px !important;
+  bottom: 0 !important; left: auto !important; width: 440px !important; max-width: 440px !important;
+  height: 100dvh !important; z-index: 900 !important; background: var(--jf-surface) !important;
+  box-shadow: -8px 0 24px rgba(24, 24, 27, .10); }
+#jf-compose-panel.open { right: 0 !important; }
+#jf-compose-panel:not(.open) { pointer-events: none; visibility: hidden; }
+#jf-compose-panel > .toggle-button { display: none !important; }
+#jf-compose-panel .sidebar-content { position: relative; height: 100%;
+  padding: 0 16px 80px !important;
+  overflow-y: auto; overflow-x: hidden; }
+.jf-compose-header { position: sticky; top: 0; z-index: 2; min-height: 56px; display: grid;
+  grid-template-columns: 1fr 40px; align-items: center; gap: 8px; background: var(--jf-surface);
+  border-bottom: 1px solid var(--jf-border); }
+.jf-compose-header > * { min-width: 0 !important; margin: 0 !important; }
+#jf-compose-close { width: 40px !important; min-width: 40px !important;
+  max-width: 40px !important; height: 40px; padding: 0; justify-self: end; }
+#jf-compose-title h2, #jf-step-request h3, #jf-step-review h3, #jf-step-calendar h3 {
+  margin: 0; color: var(--jf-ink); }
+.jf-stepper { min-height: 40px; display: flex; align-items: center;
+  justify-content: space-between; padding: 0 4px; color: var(--jf-muted); font-size: 12px;
+  border-bottom: 1px solid var(--jf-border); }
+.jf-step { padding: 16px 4px 80px; }
+.jf-table-region { max-width: 100%; overflow-x: auto; }
+.jf-panel-footer { position: fixed !important; right: 0; bottom: 0; z-index: 902;
+  width: 440px !important; min-width: 440px !important; max-width: 440px !important;
+  height: 64px; min-height: 64px;
+  display: flex; flex-wrap: nowrap !important;
+  align-items: center; gap: 8px; overflow: hidden;
+  box-sizing: border-box;
+  padding: 10px 16px; background: var(--jf-surface);
+  border-top: 1px solid var(--jf-border); }
+.jf-panel-footer > * { min-width: 0 !important; margin: 0 !important; flex: 1 1 0 !important; }
+.jf-panel-footer .jf-checkbox { height: 44px !important; min-height: 44px !important;
+  max-height: 44px !important; padding: 0 !important; overflow: visible !important; }
+.jf-panel-footer .jf-checkbox label { min-height: 44px; align-items: center; }
+.jf-error { color: var(--jf-danger); background: var(--jf-danger-bg); }
+.jf-scrim { position: fixed; inset: 0; z-index: 899; background: rgba(24, 24, 27, .28); }
 @media (max-width: 700px) {
-  .calendar-title { align-items: flex-start; flex-direction: column; }
+  #jf-page-content { padding: 0 12px 12px !important; gap: 12px !important; }
+  #jf-topbar { height: 104px; grid-template-columns: 1fr 92px 112px; grid-template-rows: 48px 48px;
+    gap: 8px 6px; border: 0; }
+  .jf-brand { font-size: 16px; }
+  #jf-topbar > .block { grid-column: 1; grid-row: 1; }
+  #jf-topbar > .form { grid-column: 2; grid-row: 1; min-width: 0 !important; }
+  #jf-selected-month { grid-column: 2; grid-row: 1; }
+  #jf-create-schedule { grid-column: 3; grid-row: 1; }
+  .jf-month-controls { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
+  #jf-calendar-workspace { min-height: calc(100dvh - 116px); }
+  .calendar-shell { height: calc(100dvh - 116px); min-height: calc(100dvh - 116px); }
+  .calendar-title { min-height: 48px; padding: 0 12px; }
+  .calendar-title h3 { font-size: 20px; }
+  .calendar-title p { font-size: 12px; }
   .calendar-grid { display: block; }
   .calendar-weekday, .calendar-day.outside-month, .calendar-day.empty-day-cell {
     display: none;
   }
-  .calendar-day { min-height: 88px; border-right: 0; padding: .75rem; }
-  .calendar-day::before { content: attr(data-date); display: block; color: var(--jf-muted);
-    font-size: .78rem; font-weight: 700; }
+  .calendar-day { min-height: 76px; border-right: 0; padding: 8px 10px; }
+  .calendar-day::before { content: attr(data-date); display: block; min-height: 32px;
+    color: var(--jf-muted); font-size: 12px; font-weight: 600; }
   .day-number { display: none; }
-  .event-title { white-space: normal; overflow-wrap: anywhere; }
+  .calendar-event { min-height: 44px; align-content: center; }
+  .event-title { display: -webkit-box; white-space: normal; overflow-wrap: anywhere;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .calendar-empty, .calendar-loading { min-height: calc(100dvh - 166px); }
+  #jf-compose-panel { inset: 0 -100dvw 0 auto !important; width: 100dvw !important;
+    max-width: none !important;
+    height: 100dvh !important; }
+  #jf-compose-panel.open { inset: 0 !important; }
+  .jf-panel-footer { width: 100dvw !important; min-width: 0 !important;
+    max-width: none !important; }
 }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { scroll-behavior: auto !important; }
+  .jf-app *, .jf-app *::before, .jf-app *::after { scroll-behavior: auto !important;
+    animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+"""
+
+APP_JS = r"""
+() => {
+  const SELECTOR = '#jf-compose-panel';
+  const appRoot = document.querySelector('gradio-app')?.shadowRoot || document;
+  const query = (selector) => appRoot.querySelector(selector);
+  let opener = null;
+  let focusCalendarOnClose = false;
+  let wasOpen = false;
+  let wasMobile = window.matchMedia('(max-width: 700px)').matches;
+  let activeStep = null;
+  const visible = (el) => !!el && getComputedStyle(el).display !== 'none' &&
+    el.getBoundingClientRect().width > 0;
+  const focusable = (panel) => [...panel.querySelectorAll(
+    'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), '
+      + 'summary, [tabindex="0"]'
+  )].filter(visible);
+  const setModal = (panel, mobile) => {
+    const page = query('#jf-page-content');
+    let scrim = query('.jf-scrim');
+    panel.setAttribute('aria-labelledby', 'jf-compose-title');
+    if (mobile) {
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'true');
+      if (page) { page.setAttribute('inert', ''); page.setAttribute('aria-hidden', 'true'); }
+      document.documentElement.style.overflow = 'hidden';
+      if (!scrim) {
+        scrim = document.createElement('div'); scrim.className = 'jf-scrim';
+        scrim.setAttribute('aria-hidden', 'true'); panel.before(scrim);
+      }
+    } else {
+      panel.setAttribute('role', 'complementary'); panel.removeAttribute('aria-modal');
+      if (page) { page.removeAttribute('inert'); page.removeAttribute('aria-hidden'); }
+      document.documentElement.style.overflow = ''; if (scrim) scrim.remove();
+    }
+  };
+  const sync = () => {
+    const panel = query(SELECTOR); if (!panel) return;
+    const portal = appRoot instanceof Document ? document.body : appRoot;
+    if (panel.parentNode !== portal) portal.append(panel);
+    query('#jf-page-content')?.setAttribute('role', 'main');
+    query('#jf-topbar')?.setAttribute('role', 'banner');
+    query('#jf-month-prev')?.setAttribute('aria-label', '이전 달');
+    query('#jf-month-next')?.setAttribute('aria-label', '다음 달');
+    query('#jf-compose-close')?.setAttribute('aria-label', '일정 만들기 닫기');
+    query('#jf-selected-month textarea')?.setAttribute('aria-label', '선택한 달');
+    ['schedule', 'unplaced'].forEach((kind) => {
+      const details = query(`#jf-${kind}-details`);
+      const body = query(`#jf-${kind}-details-body`);
+      if (details && body) body.classList.toggle('jf-details-expanded', details.open);
+    });
+    const open = panel.classList.contains('open');
+    const mobile = window.matchMedia('(max-width: 700px)').matches;
+    panel.style.setProperty('position', 'fixed', 'important');
+    panel.style.setProperty('transform', 'none', 'important');
+    panel.style.setProperty('top', '0', 'important');
+    panel.style.setProperty('bottom', '0', 'important');
+    panel.style.setProperty('height', '100dvh', 'important');
+    panel.style.setProperty('width', mobile ? '100dvw' : '440px', 'important');
+    panel.style.setProperty('max-width', mobile ? 'none' : '440px', 'important');
+    panel.style.setProperty('left', 'auto', 'important');
+    panel.style.setProperty('right', open ? '0' : (mobile ? '-100dvw' : '-440px'), 'important');
+    panel.style.setProperty('visibility', open ? 'visible' : 'hidden', 'important');
+    panel.style.setProperty('pointer-events', open ? 'auto' : 'none', 'important');
+    panel.querySelectorAll('.jf-panel-footer').forEach((footer) => {
+      footer.style.setProperty('width', mobile ? '100dvw' : '440px', 'important');
+      footer.style.setProperty('min-width', mobile ? '0' : '440px', 'important');
+      footer.style.setProperty('max-width', mobile ? 'none' : '440px', 'important');
+    });
+    query('#calendar-heading')?.setAttribute('tabindex', '-1');
+    panel.querySelectorAll(
+      '#jf-compose-title, #jf-request-error, #jf-step-request, #jf-step-review, '
+        + '#jf-step-calendar'
+    )
+      .forEach((el) => el.setAttribute('tabindex', '-1'));
+    query('#jf-request-error')?.setAttribute('role', 'alert');
+    if (open) {
+      setModal(panel, mobile);
+      if (!wasOpen || (mobile && !wasMobile && !panel.contains(document.activeElement))) {
+        requestAnimationFrame(() => query('#jf-compose-title')?.focus());
+      }
+      const step = ['#jf-step-calendar', '#jf-step-review', '#jf-step-request']
+        .map((id) => query(id)).find(visible);
+      const error = query('#jf-request-error');
+      const focusTarget = error && visible(error) && error.textContent.trim() ? error : step;
+      const focusKey = focusTarget === error
+        ? `${error.id}:${error.textContent.trim()}`
+        : focusTarget?.id || null;
+      if (wasOpen && focusTarget && activeStep !== focusKey) {
+        requestAnimationFrame(() => focusTarget.focus());
+      }
+      activeStep = focusKey;
+    } else {
+      setModal(panel, false);
+      if (wasOpen) {
+        requestAnimationFrame(() => {
+          (focusCalendarOnClose ? query('#calendar-heading') : opener)?.focus();
+          focusCalendarOnClose = false;
+        });
+      }
+      activeStep = null;
+    }
+    wasOpen = open; wasMobile = mobile;
+  };
+  appRoot.addEventListener('click', (event) => {
+    if (event.target.closest('#jf-create-schedule')) {
+      opener = event.target.closest('button') || event.target;
+    }
+    if (event.target.closest('#jf-calendar-view')) focusCalendarOnClose = true;
+  });
+  appRoot.addEventListener('keydown', (event) => {
+    const panel = query(SELECTOR);
+    if (!panel?.classList.contains('open')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault(); query('#jf-compose-close')?.click();
+    }
+    if (event.key === 'Tab' && window.matchMedia('(max-width: 700px)').matches) {
+      const items = focusable(panel); if (!items.length) return;
+      const first = items[0], last = items[items.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !items.includes(active))) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (active === last || !items.includes(active))) {
+        event.preventDefault(); first.focus();
+      }
+    }
+  });
+  appRoot.addEventListener('toggle', (event) => {
+    const details = event.target;
+    const body = query(`#${details.id}-body`);
+    if (body) body.classList.toggle('jf-details-expanded', details.open);
+  }, true);
+  const observer = new MutationObserver(sync);
+  observer.observe(appRoot, {
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'hidden', 'open'],
+    childList: true,
+  });
+  window.matchMedia('(max-width: 700px)').addEventListener('change', sync);
+  sync();
 }
 """
 
@@ -251,7 +504,9 @@ def _event_chip(event: CalendarEventView) -> str:
     )
 
 
-def _render_calendar_view(view: CalendarMonthView) -> str:
+def _render_calendar_view(
+    view: CalendarMonthView, status: str = "요청 0분 · 배치 0분 · 미배치 0분"
+) -> str:
     month_label = f"{view.selected_month.year}년 {view.selected_month.month}월"
     header = "".join(
         f'<div class="calendar-weekday" role="columnheader" aria-label="{aria}">{label}</div>'
@@ -276,8 +531,6 @@ def _render_calendar_view(view: CalendarMonthView) -> str:
                 f'<summary aria-label="{cell.date.isoformat()} 일정 {len(overflow)}개 더 보기">'
                 f'+{len(overflow)}개 더 보기</summary>{hidden_events}</details>'
             )
-        if cell.in_selected_month and not cell.events:
-            events = '<span class="empty-day">일정 없음</span>'
         aria = f"{cell.date.isoformat()}, 일정 {len(cell.events)}개"
         cells.append(
             f'<div class="{" ".join(classes)}" role="gridcell" aria-label="{aria}" '
@@ -288,7 +541,7 @@ def _render_calendar_view(view: CalendarMonthView) -> str:
     return (
         '<section class="calendar-shell" aria-labelledby="calendar-heading">'
         f'<div class="calendar-title"><h3 id="calendar-heading">{month_label}</h3>'
-        '<p>월요일 시작 · 한국 표준시</p></div>'
+        f'<p id="jf-calendar-status" aria-live="polite">{escape(status)}</p></div>'
         f'<div class="calendar-grid" role="grid" aria-label="{month_label} 월간 달력" '
         f'aria-rowcount="{view.row_count + 1}" aria-colcount="7">'
         f'{header}{"".join(cells)}</div></section>'
@@ -307,15 +560,47 @@ def render_calendar_month(
         stats=ScheduleStats(requested_minutes=0, scheduled_minutes=0, unscheduled_minutes=0),
         is_fully_scheduled=True,
     )
+    stats = safe_result.stats
+    status = (
+        f"요청 {stats.requested_minutes}분 · 배치 {stats.scheduled_minutes}분 · "
+        f"미배치 {stats.unscheduled_minutes}분"
+    )
     return _render_calendar_view(
-        build_calendar_month_view(request, safe_result, today=datetime.now(KST).date())
+        build_calendar_month_view(request, safe_result, today=datetime.now(KST).date()), status
     )
 
 
-def _empty_calendar(message: str = "일정을 만들면 월간 달력이 여기에 표시돼요.") -> str:
+def _empty_calendar(
+    message: str = "일정을 만들면 월간 달력이 여기에 표시돼요.",
+    selected_month: str | None = None,
+) -> str:
+    now = datetime.now(KST)
+    month = selected_month or f"{now.year:04d}-{now.month:02d}"
+    try:
+        parsed = _parse_selected_month(month)
+        month_label = f"{parsed.year}년 {parsed.month}월"
+    except ValueError:
+        month_label = "선택한 달"
     return (
-        '<section class="calendar-empty" role="status">'
-        f'<span aria-hidden="true">□</span><p>{escape(message)}</p></section>'
+        '<section class="calendar-shell" aria-labelledby="calendar-heading">'
+        f'<div class="calendar-title"><h3 id="calendar-heading">{month_label}</h3>'
+        '<p id="jf-calendar-status" aria-live="polite">요청 0분 · 배치 0분 · 미배치 0분</p>'
+        '</div><div class="calendar-empty" role="status">'
+        '<span aria-hidden="true">▦</span><h4>아직 일정이 없어요</h4>'
+        f'<p>{escape(message)}</p></div></section>'
+    )
+
+
+def _details_markup(kind: str, count: int) -> str:
+    if kind == "schedule":
+        element_id, label = "jf-schedule-details", "상세 일정"
+    elif kind == "unplaced":
+        element_id, label = "jf-unplaced-details", "미배치 및 진단"
+    else:
+        raise ValueError("unknown details kind")
+    return (
+        f'<details id="{element_id}" class="jf-secondary">'
+        f"<summary>{label} ({count})</summary></details>"
     )
 
 
@@ -522,11 +807,13 @@ def _invalid_edit_view(
     availability_rows: Rows,
     fixed_event_rows: Rows,
     message: str,
+    section: str | None = None,
 ) -> ReviewView:
     diagnostic = Diagnostic(
         code="SCHEMA_INVALID",
         severity=Severity.ERROR,
         message_ko=message,
+        field=section,
     )
     blocked = ValidationReport(
         normalized=(
@@ -548,6 +835,26 @@ def _invalid_edit_view(
         diagnostics=_diagnostics_text(blocked.diagnostics),
         context=_context_text(blocked.context),
         ready=False,
+    )
+
+
+def _changed_review_section(
+    previous_report: ValidationReport,
+    task_rows: Rows,
+    routine_rows: Rows,
+    availability_rows: Rows,
+    fixed_event_rows: Rows,
+) -> str:
+    previous = _view_from_report(previous_report)
+    sections = (
+        ("deadline_tasks", task_rows, previous.task_rows),
+        ("recurring_routines", routine_rows, previous.routine_rows),
+        ("availability", availability_rows, previous.availability_rows),
+        ("fixed_events", fixed_event_rows, previous.fixed_event_rows),
+    )
+    return next(
+        (section for section, current, original in sections if current != original),
+        "deadline_tasks",
     )
 
 
@@ -699,12 +1006,12 @@ def apply_table_edits(
     try:
         previous_report = ValidationReport.model_validate_json(report_json)
         table_limits = (
-            ("마감 작업", task_rows, DEADLINE_TASKS_MAX_ITEMS),
-            ("반복 일정", routine_rows, RECURRING_ROUTINES_MAX_ITEMS),
-            ("가능 시간", availability_rows, AVAILABILITY_MAX_ITEMS),
-            ("고정 일정", fixed_event_rows, FIXED_EVENTS_MAX_ITEMS),
+            ("deadline_tasks", "마감 작업", task_rows, DEADLINE_TASKS_MAX_ITEMS),
+            ("recurring_routines", "반복 일정", routine_rows, RECURRING_ROUTINES_MAX_ITEMS),
+            ("availability", "가능 시간", availability_rows, AVAILABILITY_MAX_ITEMS),
+            ("fixed_events", "고정 일정", fixed_event_rows, FIXED_EVENTS_MAX_ITEMS),
         )
-        for label, rows, maximum in table_limits:
+        for section, label, rows, maximum in table_limits:
             if len(rows) > maximum:
                 return _invalid_edit_view(
                     previous_report,
@@ -713,6 +1020,7 @@ def apply_table_edits(
                     availability_rows,
                     fixed_event_rows,
                     f"{label}은 최대 {maximum}개까지 입력할 수 있어요.",
+                    section,
                 )
         previous = previous_report.normalized or ExtractionDraft()
         tasks = {item.id: item for item in previous.deadline_tasks}
@@ -746,13 +1054,29 @@ def apply_table_edits(
                 availability_rows,
                 fixed_event_rows,
                 "표의 값과 날짜·시간 형식을 확인해 주세요.",
+                _changed_review_section(
+                    previous_report,
+                    task_rows,
+                    routine_rows,
+                    availability_rows,
+                    fixed_event_rows,
+                ),
             )
         return _safe_error_view("표의 값과 날짜·시간 형식을 확인해 주세요.")
     except Exception:
         return _safe_error_view("검토 내용을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.")
 
 
+def _selected_month_from_report_json(report_json: str) -> str | None:
+    try:
+        selected = ValidationReport.model_validate_json(report_json).context.selected_month
+    except (ValidationError, ValueError):
+        return None
+    return f"{selected.year:04d}-{selected.month:02d}"
+
+
 def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
+    selected_month = _selected_month_from_report_json(report_json)
     if not confirmed:
         return ScheduleView(
             result=None,
@@ -762,7 +1086,9 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
             summary="검토 완료를 체크해야 일정을 만들 수 있어요.",
             stats="요청 0분 · 배치 0분 · 미배치 0분",
             diagnostics="[ERROR] CONFIRMATION_REQUIRED · 검토 완료를 확인해 주세요.",
-            calendar_html=_empty_calendar("검토 완료 후 일정을 만들어 주세요."),
+            calendar_html=_empty_calendar(
+                "검토 완료 후 일정을 만들어 주세요.", selected_month=selected_month
+            ),
         )
     try:
         report = ValidationReport.model_validate_json(report_json)
@@ -776,7 +1102,9 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
             summary="검증을 통과한 입력만 일정을 만들 수 있어요.",
             stats="요청 0분 · 배치 0분 · 미배치 0분",
             diagnostics="[ERROR] CONFIRMATION_REQUIRED · 입력 진단을 확인해 주세요.",
-            calendar_html=_empty_calendar("입력 진단을 먼저 확인해 주세요."),
+            calendar_html=_empty_calendar(
+                "입력 진단을 먼저 확인해 주세요.", selected_month=selected_month
+            ),
         )
     except InternalScheduleError:
         return ScheduleView(
@@ -787,7 +1115,9 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
             summary="일정을 안전하게 만들지 못했어요.",
             stats="요청 0분 · 배치 0분 · 미배치 0분",
             diagnostics="[ERROR] INTERNAL_SCHEDULE_INVALID · 잠시 후 다시 시도해 주세요.",
-            calendar_html=_empty_calendar("일정을 안전하게 만들지 못했어요."),
+            calendar_html=_empty_calendar(
+                "일정을 안전하게 만들지 못했어요.", selected_month=selected_month
+            ),
         )
     except Exception:
         return ScheduleView(
@@ -798,7 +1128,9 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
             summary="일정을 처리하지 못했어요.",
             stats="요청 0분 · 배치 0분 · 미배치 0분",
             diagnostics="[ERROR] INTERNAL_SCHEDULE_INVALID · 잠시 후 다시 시도해 주세요.",
-            calendar_html=_empty_calendar("일정을 처리하지 못했어요."),
+            calendar_html=_empty_calendar(
+                "일정을 처리하지 못했어요.", selected_month=selected_month
+            ),
         )
     timeline: Rows = [
         [
@@ -843,6 +1175,11 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
 
 
 def _review_outputs(view: ReviewView) -> tuple[object, ...]:
+    selected_month = None
+    failed = view.report is None or view.report.normalized is None
+    if view.report is not None:
+        selected = view.report.context.selected_month
+        selected_month = f"{selected.year:04d}-{selected.month:02d}"
     return (
         view.report_json,
         view.task_rows,
@@ -859,11 +1196,23 @@ def _review_outputs(view: ReviewView) -> tuple[object, ...]:
         "아직 일정이 없어요.",
         "요청 0분 · 배치 0분 · 미배치 0분",
         "진단 없음",
-        _empty_calendar(),
+        _empty_calendar(selected_month=selected_month),
+        _details_markup("schedule", 0),
+        _details_markup("unplaced", 0),
+        gr.Markdown(value=view.diagnostics if failed else "", visible=failed),
+        gr.Sidebar(open=True),
+        gr.Column(visible=failed),
+        gr.Column(visible=not failed),
+        gr.Column(visible=False),
+        *_review_section_updates(view.report),
     )
 
 
 def _edit_outputs(view: ReviewView) -> tuple[object, ...]:
+    selected_month = None
+    if view.report is not None:
+        selected = view.report.context.selected_month
+        selected_month = f"{selected.year:04d}-{selected.month:02d}"
     return (
         view.report_json,
         view.task_rows,
@@ -880,7 +1229,59 @@ def _edit_outputs(view: ReviewView) -> tuple[object, ...]:
         "입력이 바뀌어 이전 일정을 지웠어요.",
         "요청 0분 · 배치 0분 · 미배치 0분",
         "진단 없음",
-        _empty_calendar("입력이 바뀌어 이전 일정을 지웠어요."),
+        _empty_calendar(
+            "입력이 바뀌어 이전 일정을 지웠어요.", selected_month=selected_month
+        ),
+        _details_markup("schedule", 0),
+        _details_markup("unplaced", 0),
+        gr.Markdown(value="", visible=False),
+        gr.Sidebar(open=True),
+        gr.Column(visible=False),
+        gr.Column(visible=True),
+        gr.Column(visible=False),
+        *_review_section_updates(view.report),
+    )
+
+
+def _review_section_updates(
+    report: ValidationReport | None,
+) -> tuple[gr.Accordion, gr.Accordion, gr.Accordion, gr.Accordion]:
+    open_index = 0
+    if report is not None and report.normalized is not None:
+        section_indexes = {
+            "deadline_tasks": 0,
+            "recurring_routines": 1,
+            "availability": 2,
+            "fixed_events": 3,
+        }
+        entity_groups = (
+            {item.id for item in report.normalized.deadline_tasks},
+            {item.id for item in report.normalized.recurring_routines},
+            {item.id for item in report.normalized.availability},
+            {item.id for item in report.normalized.fixed_events},
+        )
+        for diagnostic in report.diagnostics:
+            if diagnostic.severity != Severity.ERROR:
+                continue
+            if diagnostic.field in section_indexes:
+                open_index = section_indexes[diagnostic.field]
+                break
+            if diagnostic.entity_id is None:
+                continue
+            matched = next(
+                (
+                    index
+                    for index, entity_ids in enumerate(entity_groups)
+                    if diagnostic.entity_id in entity_ids
+                ),
+                None,
+            )
+            if matched is not None:
+                open_index = matched
+                break
+    return cast(
+        tuple[gr.Accordion, gr.Accordion, gr.Accordion, gr.Accordion],
+        tuple(gr.Accordion(open=index == open_index) for index in range(4)),
     )
 
 
@@ -893,6 +1294,7 @@ def _confirmation_button(confirmed: bool, report_json: str) -> gr.Button:
 
 
 def _schedule_outputs(view: ScheduleView) -> tuple[object, ...]:
+    completed = view.result is not None
     return (
         view.result_json,
         view.timeline_rows,
@@ -901,6 +1303,14 @@ def _schedule_outputs(view: ScheduleView) -> tuple[object, ...]:
         view.stats,
         view.diagnostics,
         view.calendar_html,
+        _details_markup("schedule", len(view.timeline_rows)),
+        _details_markup("unplaced", len(view.unscheduled_rows)),
+        gr.Markdown(value="", visible=False),
+        gr.Sidebar(open=True),
+        gr.Column(visible=False),
+        gr.Column(visible=not completed),
+        gr.Column(visible=completed),
+        gr.Button(interactive=not completed),
     )
 
 
@@ -908,7 +1318,12 @@ def _schedule_callback(report_json: str, confirmed: bool) -> tuple[object, ...]:
     return _schedule_outputs(schedule_review(report_json, confirmed))
 
 
-def _begin_parse() -> tuple[object, ...]:
+def _begin_parse(selected_month: str) -> tuple[object, ...]:
+    loading_calendar = _empty_calendar("일정을 만들고 있어요.", selected_month=selected_month)
+    loading_calendar = loading_calendar.replace(
+        'class="calendar-empty" role="status"',
+        'class="calendar-loading" role="status" aria-live="polite"',
+    ).replace("요청 0분 · 배치 0분 · 미배치 0분", "분석 중")
     return (
         gr.Button(interactive=False),
         False,
@@ -919,9 +1334,32 @@ def _begin_parse() -> tuple[object, ...]:
         "입력을 분석하고 있어요.",
         "요청 0분 · 배치 0분 · 미배치 0분",
         "진단 없음",
-        '<section class="calendar-loading" role="status" aria-live="polite">'
-        "입력을 분석하고 있어요.</section>",
+        loading_calendar,
+        _details_markup("schedule", 0),
+        _details_markup("unplaced", 0),
+        gr.Markdown(value="", visible=False),
+        gr.Sidebar(open=True),
+        gr.Column(visible=True),
+        gr.Column(visible=False),
+        gr.Column(visible=False),
     )
+
+
+def _begin_schedule(report_json: str) -> tuple[object, ...]:
+    selected_month = None
+    try:
+        report = ValidationReport.model_validate_json(report_json)
+        selected = report.context.selected_month
+        selected_month = f"{selected.year:04d}-{selected.month:02d}"
+    except (ValidationError, ValueError):
+        pass
+    loading_calendar = _empty_calendar(
+        "일정을 만들고 있어요.", selected_month=selected_month
+    ).replace(
+        'class="calendar-empty" role="status"',
+        'class="calendar-loading" role="status" aria-live="polite"',
+    )
+    return gr.Button(interactive=False), loading_calendar
 
 
 def invalidate_input(reference_datetime: str, selected_month: str) -> ReviewView:
@@ -964,7 +1402,15 @@ def _clear_for_input(reference_datetime: str, selected_month: str) -> tuple[obje
         "아직 일정이 없어요.",
         "요청 0분 · 배치 0분 · 미배치 0분",
         "진단 없음",
-        _empty_calendar(),
+        _empty_calendar(selected_month=selected_month),
+        _details_markup("schedule", 0),
+        _details_markup("unplaced", 0),
+        gr.Markdown(value="", visible=False),
+        gr.Sidebar(open=True),
+        gr.Column(visible=True),
+        gr.Column(visible=False),
+        gr.Column(visible=False),
+        *_review_section_updates(None),
     )
 
 
@@ -993,6 +1439,7 @@ def _demo_and_enable_parse() -> tuple[object, ...]:
         gr.Button(interactive=True),
         reference,
         selected_month,
+        selected_month,
     )
 
 
@@ -1018,111 +1465,129 @@ def _clear_and_enable_parse(
     )
 
 
+def _move_month(selected_month: str, delta: int) -> str:
+    selected = _parse_selected_month(selected_month)
+    absolute = selected.year * 12 + selected.month - 1 + delta
+    year, zero_based_month = divmod(absolute, 12)
+    if year < 1 or year > 9998:
+        return selected_month
+    return f"{year:04d}-{zero_based_month + 1:02d}"
+
+
+def _month_button_updates(selected_month: str) -> tuple[gr.Button, gr.Button]:
+    try:
+        selected = _parse_selected_month(selected_month)
+    except ValueError:
+        return gr.Button(interactive=False), gr.Button(interactive=False)
+    at_first_month = selected.year == 1 and selected.month == 1
+    at_last_month = selected.year == 9998 and selected.month == 12
+    return (
+        gr.Button(interactive=not at_first_month),
+        gr.Button(interactive=not at_last_month),
+    )
+
+
+def _current_month() -> str:
+    now = datetime.now(KST)
+    return f"{now.year:04d}-{now.month:02d}"
+
+
+def _topbar_month_outputs(reference_datetime: str, selected_month: str) -> tuple[object, ...]:
+    cleared = list(_clear_and_enable_parse(reference_datetime, selected_month))
+    cleared[-9] = gr.Sidebar(open=False)
+    return (
+        *cleared,
+        selected_month,
+        selected_month,
+        *_month_button_updates(selected_month),
+    )
+
+
+def _navigate_month(
+    reference_datetime: str, selected_month: str, delta: int
+) -> tuple[object, ...]:
+    return _topbar_month_outputs(
+        reference_datetime, _move_month(selected_month, delta)
+    )
+
+
+def _navigate_current_month(
+    reference_datetime: str, _selected_month: str
+) -> tuple[object, ...]:
+    return _topbar_month_outputs(reference_datetime, _current_month())
+
+
 def build_blocks() -> gr.Blocks:
     now = datetime.now(KST).replace(second=0, microsecond=0)
+    month_value = f"{now.year:04d}-{now.month:02d}"
+    context_value = _context_text(
+        ParseContext(
+            reference_datetime=now,
+            selected_month=SelectedMonth(year=now.year, month=now.month),
+        )
+    )
     with gr.Blocks(
         title="JobFlow — 월간 규칙 기반 일정",
         analytics_enabled=False,
         fill_width=True,
+        elem_classes=["jf-app"],
     ) as app:
         report_state = gr.State("")
         result_state = gr.State("")
-        gr.Markdown(
-            "# JobFlow\n"
-            "한국어 작업을 검토한 뒤 선택한 달에 배치하는 **규칙 기반 일정** 도구예요.  "
-            "월간 달력을 먼저 보고 상세 일정과 미배치 사유도 확인할 수 있어요. "
-            "새로고침하거나 프로세스를 종료하면 데이터가 사라져요.",
-            elem_classes=["jf-hero"],
-        )
-        with gr.Row():
-            text_input = gr.Textbox(
-                label="한국어 일정 요청",
-                lines=8,
-                max_length=RAW_INPUT_MAX_CHARS,
-                placeholder="마감 작업, 반복 일정, 가능한 시간, 고정 일정을 입력하세요.",
+        summary_state = gr.State("아직 일정이 없어요.")
+        stats_state = gr.State("요청 0분 · 배치 0분 · 미배치 0분")
+
+        with gr.Column(elem_id="jf-page-content", elem_classes=["jf-app"]):
+            with gr.Row(elem_id="jf-topbar"):
+                gr.HTML(
+                    '<a id="jf-skip-link" href="#calendar-heading">달력으로 건너뛰기</a>'
+                    '<p class="jf-brand">JobFlow</p>',
+                    apply_default_css=False,
+                    js_on_load=None,
+                )
+                with gr.Row(elem_classes=["jf-month-controls"]):
+                    previous_month = gr.Button(
+                        "‹",
+                        elem_id="jf-month-prev",
+                        elem_classes=["jf-button"],
+                    )
+                    current_month = gr.Button(
+                        "이번 달",
+                        elem_id="jf-month-current",
+                        elem_classes=["jf-button"],
+                    )
+                    next_month = gr.Button(
+                        "›",
+                        elem_id="jf-month-next",
+                        elem_classes=["jf-button"],
+                    )
+                selected_month_display = gr.Textbox(
+                    value=month_value,
+                    show_label=False,
+                    interactive=False,
+                    elem_id="jf-selected-month",
+                )
+                create_button = gr.Button(
+                    "일정 만들기",
+                    variant="primary",
+                    elem_id="jf-create-schedule",
+                    elem_classes=["jf-button"],
+                )
+
+            with gr.Column(elem_id="jf-calendar-workspace"):
+                calendar_html = gr.HTML(
+                    _empty_calendar(selected_month=month_value),
+                    label="월간 달력",
+                    apply_default_css=False,
+                    js_on_load=None,
+                )
+
+            schedule_details = gr.HTML(
+                _details_markup("schedule", 0),
+                apply_default_css=False,
+                js_on_load=None,
             )
-            with gr.Column():
-                reference_input = gr.Textbox(
-                    label="기준 시각 (KST, YYYY-MM-DD HH:MM)",
-                    value=_format_datetime(now),
-                )
-                planning_input = gr.Textbox(
-                    label="계획 월 (KST, YYYY-MM)",
-                    value=f"{now.year:04d}-{now.month:02d}",
-                    placeholder="2026-03",
-                    max_lines=1,
-                )
-                context_box = gr.Markdown(
-                    _context_text(
-                        ParseContext(
-                            reference_datetime=now,
-                            selected_month=SelectedMonth(year=now.year, month=now.month),
-                        )
-                    ),
-                    label="기준 컨텍스트",
-                )
-        gr.Markdown(
-            "**개인정보·비용 안내:** 입력한 한국어 원문은 **Parse 버튼을 누를 때만** "
-            "로컬 `.env`에 설정한 OpenAI API로 전송되며 API 비용이 발생할 수 있어요. "
-            "일정 생성은 모델을 호출하지 않고 JobFlow는 입력과 결과를 저장하지 않아요."
-        )
-        with gr.Row():
-            parse_button = gr.Button("Parse — AI로 구조화", variant="primary")
-            demo_button = gr.Button("키 없이 구조화 데모 불러오기")
-
-        gr.Markdown("## 구조화 검토")
-        task_table = gr.Dataframe(
-            headers=TASK_HEADERS,
-            datatype=[
-                "str", "str", "number", "str", "str", "number", "bool", "number",
-                "number", "number", "str", "bool",
-            ],
-            value=[],
-            label="마감 작업",
-            interactive=True,
-            type="array",
-        )
-        routine_table = gr.Dataframe(
-            headers=ROUTINE_HEADERS,
-            datatype=[
-                "str", "str", "number", "str", "str", "str", "str", "str", "number",
-                "bool", "bool",
-            ],
-            value=[],
-            label="반복 일정",
-            interactive=True,
-            type="array",
-        )
-        availability_table = gr.Dataframe(
-            headers=AVAILABILITY_HEADERS,
-            datatype=["str", "str", "str", "str", "str", "str", "bool"],
-            value=[],
-            label="가능 시간",
-            interactive=True,
-            type="array",
-        )
-        fixed_event_table = gr.Dataframe(
-            headers=FIXED_EVENT_HEADERS,
-            datatype=["str", "str", "str", "str", "bool"],
-            value=[],
-            label="고정 일정",
-            interactive=True,
-            type="array",
-        )
-        diagnostics_box = gr.Textbox(label="필드·항목 진단", value="진단 없음", lines=5)
-        with gr.Row():
-            confirmed_box = gr.Checkbox(label="검토 완료", value=False)
-            schedule_button = gr.Button("규칙 기반 일정 만들기", interactive=False)
-
-        gr.Markdown("## 규칙 기반 일정")
-        summary_box = gr.Textbox(label="결정적 요약", value="아직 일정이 없어요.")
-        stats_box = gr.Textbox(
-            label="통계", value="요청 0분 · 배치 0분 · 미배치 0분"
-        )
-        with gr.Tabs():
-            with gr.Tab("월간 달력", id="month"):
-                calendar_html = gr.HTML(_empty_calendar(), label="월간 달력")
-            with gr.Tab("상세 일정", id="details"):
+            with gr.Column(elem_id="jf-schedule-details-body", elem_classes=["jf-details-body"]):
                 timeline_table = gr.Dataframe(
                     headers=TIMELINE_HEADERS,
                     datatype=["str", "str", "str", "str", "str", "number"],
@@ -1131,26 +1596,206 @@ def build_blocks() -> gr.Blocks:
                     interactive=False,
                     type="array",
                 )
-            with gr.Tab("미배치 및 진단", id="diagnostics"):
+            unplaced_details = gr.HTML(
+                _details_markup("unplaced", 0),
+                apply_default_css=False,
+                js_on_load=None,
+            )
+            with gr.Column(elem_id="jf-unplaced-details-body", elem_classes=["jf-details-body"]):
                 unscheduled_table = gr.Dataframe(
                     headers=UNSCHEDULED_HEADERS,
                     datatype=[
-                        "str", "str", "str", "str", "number", "number", "number",
-                        "str", "str", "str",
+                        "str",
+                        "str",
+                        "str",
+                        "str",
+                        "number",
+                        "number",
+                        "number",
+                        "str",
+                        "str",
+                        "str",
                     ],
                     value=[],
-                    label="미배치 작업 (항상 표시)",
+                    label="미배치 작업",
                     interactive=False,
                     type="array",
-                    elem_classes=["warning-panel"],
                 )
                 schedule_diagnostics = gr.Textbox(
                     label="일정 진단",
                     value="진단 없음",
                     lines=4,
-                    elem_classes=["warning-panel"],
+                    interactive=False,
                 )
 
+        with gr.Sidebar(
+            label="일정 만들기",
+            position="right",
+            width=440,
+            open=False,
+            elem_id="jf-compose-panel",
+            elem_classes=["jf-app"],
+        ) as compose_panel:
+            with gr.Row(elem_classes=["jf-compose-header"]):
+                gr.Markdown("## 일정 만들기", elem_id="jf-compose-title")
+                close_button = gr.Button(
+                    "×",
+                    elem_id="jf-compose-close",
+                    elem_classes=["jf-button"],
+                )
+            gr.HTML(
+                '<div class="jf-stepper" aria-label="진행 단계">'
+                '<span>1 요청</span><span>2 확인</span><span>3 캘린더</span></div>',
+                apply_default_css=False,
+                js_on_load=None,
+            )
+            with gr.Column(visible=True, elem_classes=["jf-step"]) as request_step:
+                gr.Markdown("### 요청 입력", elem_id="jf-step-request")
+                request_error = gr.Markdown(
+                    "",
+                    visible=False,
+                    elem_id="jf-request-error",
+                    elem_classes=["jf-error"],
+                )
+                gr.Markdown("일정으로 바꿀 작업과 반복 습관을 한국어로 적어 주세요.")
+                text_input = gr.Textbox(
+                    label="한국어 일정 요청",
+                    lines=8,
+                    max_length=RAW_INPUT_MAX_CHARS,
+                    placeholder="마감 작업, 반복 일정, 가능한 시간, 고정 일정을 입력하세요.",
+                    elem_classes=["jf-text-field"],
+                )
+                planning_input = gr.Textbox(
+                    label="계획 월 (KST, YYYY-MM)",
+                    value=month_value,
+                    placeholder="2026-03",
+                    max_lines=1,
+                    elem_classes=["jf-text-field"],
+                )
+                with gr.Accordion("고급 설정", open=False):
+                    reference_input = gr.Textbox(
+                        label="기준 시각 (KST, YYYY-MM-DD HH:MM)",
+                        value=_format_datetime(now),
+                        elem_classes=["jf-text-field"],
+                    )
+                    context_box = gr.Markdown(context_value, label="기준 컨텍스트")
+                gr.Markdown(
+                    "**개인정보·비용:** 요청 분석 시에만 로컬 `.env`의 OpenAI API로 "
+                    "원문을 한 번 전송해요. 일정 생성은 모델을 호출하지 않고 저장하지 않아요."
+                )
+                with gr.Row(elem_classes=["jf-panel-footer"]):
+                    demo_button = gr.Button("예시 불러오기", elem_classes=["jf-button"])
+                    parse_button = gr.Button(
+                        "요청 분석하기",
+                        variant="primary",
+                        elem_classes=["jf-button"],
+                    )
+
+            with gr.Column(visible=False, elem_classes=["jf-step"]) as review_step:
+                gr.Markdown("### 일정 확인", elem_id="jf-step-review")
+                diagnostics_box = gr.Textbox(
+                    label="필드·항목 진단",
+                    value="진단 없음",
+                    lines=4,
+                    interactive=False,
+                )
+                with gr.Accordion("마감 작업", open=True) as task_section:
+                    task_table = gr.Dataframe(
+                        headers=TASK_HEADERS,
+                        datatype=[
+                            "str",
+                            "str",
+                            "number",
+                            "str",
+                            "str",
+                            "number",
+                            "bool",
+                            "number",
+                            "number",
+                            "number",
+                            "str",
+                            "bool",
+                        ],
+                        value=[],
+                        label="마감 작업",
+                        interactive=True,
+                        type="array",
+                        elem_classes=["jf-table-region"],
+                    )
+                with gr.Accordion("반복 일정", open=False) as routine_section:
+                    routine_table = gr.Dataframe(
+                        headers=ROUTINE_HEADERS,
+                        datatype=[
+                            "str",
+                            "str",
+                            "number",
+                            "str",
+                            "str",
+                            "str",
+                            "str",
+                            "str",
+                            "number",
+                            "bool",
+                            "bool",
+                        ],
+                        value=[],
+                        label="반복 일정",
+                        interactive=True,
+                        type="array",
+                        elem_classes=["jf-table-region"],
+                    )
+                with gr.Accordion("가능 시간", open=False) as availability_section:
+                    availability_table = gr.Dataframe(
+                        headers=AVAILABILITY_HEADERS,
+                        datatype=["str", "str", "str", "str", "str", "str", "bool"],
+                        value=[],
+                        label="가능 시간",
+                        interactive=True,
+                        type="array",
+                        elem_classes=["jf-table-region"],
+                    )
+                with gr.Accordion("고정 일정", open=False) as fixed_event_section:
+                    fixed_event_table = gr.Dataframe(
+                        headers=FIXED_EVENT_HEADERS,
+                        datatype=["str", "str", "str", "str", "bool"],
+                        value=[],
+                        label="고정 일정",
+                        interactive=True,
+                        type="array",
+                        elem_classes=["jf-table-region"],
+                    )
+                with gr.Row(elem_classes=["jf-panel-footer"]):
+                    confirmed_box = gr.Checkbox(
+                        label="검토 완료",
+                        value=False,
+                        elem_classes=["jf-checkbox"],
+                    )
+                    schedule_button = gr.Button(
+                        "캘린더에 반영",
+                        interactive=False,
+                        variant="primary",
+                        elem_classes=["jf-button"],
+                    )
+
+            with gr.Column(visible=False, elem_classes=["jf-step"]) as calendar_step:
+                gr.Markdown("### 캘린더", elem_id="jf-step-calendar")
+                gr.Markdown(
+                    "일정이 캘린더에 반영됐어요. 상세 일정과 진단은 달력 아래에서 확인해요."
+                )
+                calendar_view_button = gr.Button(
+                    "캘린더에서 보기",
+                    variant="primary",
+                    elem_id="jf-calendar-view",
+                    elem_classes=["jf-button"],
+                )
+
+        workflow_outputs = [compose_panel, request_step, review_step, calendar_step]
+        review_section_outputs = [
+            task_section,
+            routine_section,
+            availability_section,
+            fixed_event_section,
+        ]
         review_outputs = [
             report_state,
             task_table,
@@ -1164,26 +1809,43 @@ def build_blocks() -> gr.Blocks:
             result_state,
             timeline_table,
             unscheduled_table,
-            summary_box,
-            stats_box,
+            summary_state,
+            stats_state,
             schedule_diagnostics,
             calendar_html,
+            schedule_details,
+            unplaced_details,
+            request_error,
+            *workflow_outputs,
+            *review_section_outputs,
         ]
         schedule_outputs = [
             result_state,
             timeline_table,
             unscheduled_table,
-            summary_box,
-            stats_box,
+            summary_state,
+            stats_state,
             schedule_diagnostics,
             calendar_html,
+            schedule_details,
+            unplaced_details,
+            request_error,
+            *workflow_outputs,
+            schedule_button,
         ]
         confirmation_event = confirmed_box.change(
             _confirmation_button,
             inputs=[confirmed_box, report_state],
             outputs=schedule_button,
         )
-        schedule_response = schedule_button.click(
+        schedule_event = schedule_button.click(
+            _begin_schedule,
+            inputs=report_state,
+            outputs=[schedule_button, calendar_html],
+            queue=False,
+            trigger_mode="once",
+        )
+        schedule_response = schedule_event.then(
             _schedule_callback,
             inputs=[report_state, confirmed_box],
             outputs=schedule_outputs,
@@ -1197,6 +1859,7 @@ def build_blocks() -> gr.Blocks:
         ]
         parse_event = parse_button.click(
             _begin_parse,
+            inputs=planning_input,
             outputs=begin_parse_outputs,
             queue=False,
             trigger_mode="once",
@@ -1209,12 +1872,19 @@ def build_blocks() -> gr.Blocks:
             trigger_mode="once",
         )
         parse_response.then(
-            lambda: gr.Button(interactive=True), outputs=parse_button, queue=False
+            lambda: gr.Button(interactive=True),
+            outputs=parse_button,
+            queue=False,
         )
         review_and_parse_outputs = [*review_outputs, parse_button]
         demo_button.click(
             _demo_and_enable_parse,
-            outputs=[*review_and_parse_outputs, reference_input, planning_input],
+            outputs=[
+                *review_and_parse_outputs,
+                reference_input,
+                planning_input,
+                selected_month_display,
+            ],
             cancels=[parse_response, schedule_response],
         )
 
@@ -1241,6 +1911,64 @@ def build_blocks() -> gr.Blocks:
                 outputs=review_and_parse_outputs,
                 cancels=[parse_response, schedule_response],
             )
+
+        create_button.click(
+            lambda: (
+                gr.Sidebar(open=True),
+                gr.Column(visible=True),
+                gr.Column(visible=False),
+                gr.Column(visible=False),
+            ),
+            outputs=workflow_outputs,
+            queue=False,
+        )
+        close_button.click(
+            lambda: gr.Sidebar(open=False),
+            outputs=compose_panel,
+            queue=False,
+        )
+        calendar_view_button.click(
+            lambda: gr.Sidebar(open=False),
+            outputs=compose_panel,
+            queue=False,
+        )
+        topbar_month_outputs = [
+            *review_and_parse_outputs,
+            planning_input,
+            selected_month_display,
+            previous_month,
+            next_month,
+        ]
+        previous_month.click(
+            lambda reference, month: _navigate_month(reference, month, -1),
+            inputs=[reference_input, planning_input],
+            outputs=topbar_month_outputs,
+            queue=False,
+        )
+        next_month.click(
+            lambda reference, month: _navigate_month(reference, month, 1),
+            inputs=[reference_input, planning_input],
+            outputs=topbar_month_outputs,
+            queue=False,
+        )
+        current_month.click(
+            _navigate_current_month,
+            inputs=[reference_input, planning_input],
+            outputs=topbar_month_outputs,
+            queue=False,
+        )
+        planning_input.input(
+            lambda month: month,
+            inputs=planning_input,
+            outputs=selected_month_display,
+            queue=False,
+        )
+        planning_input.input(
+            _month_button_updates,
+            inputs=planning_input,
+            outputs=[previous_month, next_month],
+            queue=False,
+        )
     return cast(gr.Blocks, app)
 
 

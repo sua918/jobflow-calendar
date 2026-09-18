@@ -2,15 +2,32 @@ from __future__ import annotations
 
 import asyncio
 import os
+from typing import Any
 
 import gradio as gr
 
 from jobflow.app import build_app, main
-from jobflow.models import RAW_INPUT_MAX_CHARS, ExtractionMethod, UnscheduledReason
+from jobflow.models import (
+    RAW_INPUT_MAX_CHARS,
+    Diagnostic,
+    ExtractionMethod,
+    Severity,
+    UnscheduledReason,
+)
 from jobflow.services import build_calendar_month_view
 from jobflow.ui import (
+    APP_JS,
+    _begin_parse,
+    _begin_schedule,
+    _details_markup,
+    _month_button_updates,
+    _move_month,
+    _navigate_current_month,
+    _navigate_month,
     _parse_selected_month,
     _render_calendar_view,
+    _review_outputs,
+    _review_section_updates,
     apply_table_edits,
     invalidate_input,
     load_canonical_demo,
@@ -28,6 +45,81 @@ def test_build_app_constructs_without_openai_key(monkeypatch) -> None:
 
     assert isinstance(app, gr.Blocks)
     assert app.analytics_enabled is False
+
+
+def test_calendar_first_component_tree_uses_owned_roots_and_native_sidebar() -> None:
+    app = build_app()
+    components = app.config["components"]
+    by_elem_id = {
+        component["props"].get("elem_id"): component
+        for component in components
+        if component["props"].get("elem_id")
+    }
+
+    required_component_ids = {
+        "jf-page-content",
+        "jf-topbar",
+        "jf-calendar-workspace",
+        "jf-month-prev",
+        "jf-month-current",
+        "jf-month-next",
+        "jf-selected-month",
+        "jf-create-schedule",
+        "jf-compose-panel",
+        "jf-compose-title",
+        "jf-compose-close",
+        "jf-step-request",
+        "jf-step-review",
+        "jf-step-calendar",
+    }
+    assert required_component_ids <= by_elem_id.keys()
+    html_config = "\n".join(
+        str(component["props"].get("html_template", ""))
+        + str(component["props"].get("value", ""))
+        for component in components
+    )
+    for semantic_id in ("jf-schedule-details", "jf-unplaced-details"):
+        assert f'id="{semantic_id}"' in html_config
+    sidebar = by_elem_id["jf-compose-panel"]
+    assert sidebar["type"] == "sidebar"
+    assert sidebar["props"]["position"] == "right"
+    assert sidebar["props"]["width"] == 440
+    assert sidebar["props"]["open"] is False
+
+    component_text = [
+        component["props"].get("elem_id")
+        or component["props"].get("html_template", "")
+        for component in components
+    ]
+    topbar_index = next(i for i, value in enumerate(component_text) if "jf-topbar" in value)
+    calendar_index = next(
+        i for i, value in enumerate(component_text) if "jf-calendar-workspace" in value
+    )
+    assert topbar_index < calendar_index < component_text.index("jf-compose-panel")
+
+
+def test_calendar_first_removes_hero_summary_boxes_and_starts_details_closed() -> None:
+    app = build_app()
+    components = app.config["components"]
+    labels = {component["props"].get("label") for component in components}
+    classes = {
+        class_name
+        for component in components
+        for class_name in component["props"].get("elem_classes", [])
+    }
+    html_config = "\n".join(
+        str(component["props"].get("html_template", ""))
+        + str(component["props"].get("value", ""))
+        for component in components
+    )
+
+    assert "jf-hero" not in classes
+    assert "결정적 요약" not in labels
+    assert "통계" not in labels
+    assert '<details id="jf-schedule-details" class="jf-secondary">' in html_config
+    assert '<details id="jf-unplaced-details" class="jf-secondary">' in html_config
+    assert '<details id="jf-schedule-details" class="jf-secondary" open' not in html_config
+    assert '<details id="jf-unplaced-details" class="jf-secondary" open' not in html_config
 
 
 def test_raw_input_config_exposes_authoritative_max_length() -> None:
@@ -94,7 +186,7 @@ def test_parse_start_immediately_disables_confirmation_and_schedule() -> None:
     )
 
     assert components["검토 완료"] in begin_parse["outputs"]
-    assert components["규칙 기반 일정 만들기"] in begin_parse["outputs"]
+    assert components["캘린더에 반영"] in begin_parse["outputs"]
     assert components["상세 일정"] in begin_parse["outputs"]
     assert components["월간 달력"] in begin_parse["outputs"]
 
@@ -123,6 +215,163 @@ def test_selected_month_adapter_accepts_only_year_month() -> None:
             pass
         else:
             raise AssertionError(f"invalid month accepted: {invalid}")
+
+
+def test_review_and_loading_calendar_keep_the_requested_month_visible() -> None:
+    review = load_canonical_demo()
+    assert review.report is not None
+
+    review_calendar = _review_outputs(review)[15]
+    loading_calendar = _begin_parse("2026-03")[9]
+
+    assert "2026년 3월" in review_calendar
+    assert "2026년 3월" in loading_calendar
+
+
+def test_review_opens_first_section_with_an_error_or_deadlines_by_default() -> None:
+    review = load_canonical_demo()
+    assert review.report is not None and review.report.normalized is not None
+
+    defaults = _review_section_updates(review.report)
+    assert [section.open for section in defaults] == [True, False, False, False]
+
+    routine_id = review.report.normalized.recurring_routines[0].id
+    routine_error = review.report.model_copy(
+        update={
+            "diagnostics": [
+                Diagnostic(
+                    code="TEST_ERROR",
+                    severity=Severity.ERROR,
+                    message_ko="반복 일정 오류",
+                    entity_id=routine_id,
+                )
+            ]
+        },
+        deep=True,
+    )
+    sections = _review_section_updates(routine_error)
+    assert [section.open for section in sections] == [False, True, False, False]
+
+    routine_rows = [row.copy() for row in review.routine_rows]
+    routine_rows[0][2] = "잘못된 값"
+    malformed = apply_table_edits(
+        review.report_json,
+        review.task_rows,
+        routine_rows,
+        review.availability_rows,
+        review.fixed_event_rows,
+    )
+    assert malformed.report is not None
+    malformed_sections = _review_section_updates(malformed.report)
+    assert [section.open for section in malformed_sections] == [False, True, False, False]
+
+
+def test_schedule_enters_loading_state_before_synchronous_result() -> None:
+    review = load_canonical_demo()
+
+    button, calendar = _begin_schedule(review.report_json)
+
+    assert isinstance(button, gr.Button)
+    assert button.interactive is False
+    assert "일정을 만들고 있어요" in calendar
+    assert "calendar-loading" in calendar
+
+
+def test_boundary_month_navigation_disables_unavailable_direction() -> None:
+    first_previous, first_next = _month_button_updates("0001-01")
+    last_previous, last_next = _month_button_updates("9998-12")
+
+    assert first_previous.interactive is False
+    assert first_next.interactive is True
+    assert last_previous.interactive is True
+    assert last_next.interactive is False
+
+
+def test_close_button_receives_descriptive_accessible_name() -> None:
+    assert "#jf-compose-close" in APP_JS
+    assert "일정 만들기 닫기" in APP_JS
+
+
+def test_parse_failure_stays_on_request_step_with_visible_error(monkeypatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    failed = asyncio.run(parse_input("지원서 작성", "2026-03-02 09:00", "2026-03"))
+
+    outputs = _review_outputs(failed)
+    request_error: Any = outputs[18]
+    request_step: Any
+    review_step: Any
+    calendar_step: Any
+    request_step, review_step, calendar_step = outputs[20:23]
+
+    assert failed.report is not None and failed.report.normalized is None
+    assert isinstance(request_error, gr.Markdown)
+    assert request_error.value == failed.diagnostics
+    assert request_error.visible is True
+    assert isinstance(request_step, gr.Column)
+    assert isinstance(review_step, gr.Column)
+    assert isinstance(calendar_step, gr.Column)
+    assert request_step.visible is True
+    assert review_step.visible is False
+    assert calendar_step.visible is False
+
+
+def test_month_navigation_clears_stale_outputs_and_syncs_both_month_controls() -> None:
+    app = build_app()
+    components = app.config["components"]
+    by_elem_id = {
+        component["props"].get("elem_id"): component["id"]
+        for component in components
+        if component["props"].get("elem_id")
+    }
+    calendar_id = next(
+        component["id"]
+        for component in components
+        if component["props"].get("label") == "월간 달력"
+    )
+    month_dependencies = [
+        dependency
+        for dependency in app.config["dependencies"]
+        if by_elem_id["jf-month-prev"]
+        in [target[0] for target in dependency.get("targets", [])]
+    ]
+
+    assert len(month_dependencies) == 1
+    outputs = month_dependencies[0]["outputs"]
+    assert by_elem_id["jf-selected-month"] in outputs
+    assert calendar_id in outputs
+    assert len(outputs) > 10  # review/result state is invalidated, not only the textbox
+
+
+def test_month_navigation_outputs_handle_rollover_boundaries_and_invalidation() -> None:
+    assert _move_month("2026-12", 1) == "2027-01"
+    assert _move_month("2026-01", -1) == "2025-12"
+    assert _move_month("0001-01", -1) == "0001-01"
+    assert _move_month("9998-12", 1) == "9998-12"
+
+    moved = _navigate_month("2026-03-02 09:00", "2026-03", 1)
+    current = _navigate_current_month("2026-03-02 09:00", "2026-03")
+
+    assert moved[-4:-2] == ("2026-04", "2026-04")
+    assert moved[0] == ""  # stale report state cleared
+    assert current[-4] == current[-3]
+    assert isinstance(current[-3], str)
+    assert _parse_selected_month(current[-3])
+
+
+def test_secondary_disclosure_markup_includes_result_counts_and_starts_closed() -> None:
+    schedule = _details_markup("schedule", 13)
+    unplaced = _details_markup("unplaced", 2)
+
+    assert schedule == (
+        '<details id="jf-schedule-details" class="jf-secondary">'
+        "<summary>상세 일정 (13)</summary></details>"
+    )
+    assert unplaced == (
+        '<details id="jf-unplaced-details" class="jf-secondary">'
+        "<summary>미배치 및 진단 (2)</summary></details>"
+    )
+    assert " open" not in schedule
+    assert " open" not in unplaced
 
 
 def test_calendar_is_semantic_monday_first_and_escapes_titles() -> None:
@@ -190,7 +439,9 @@ def test_calendar_overflow_control_exposes_ordered_extra_events() -> None:
     busy_day = next(day for day in month.days if day.events)
     original = busy_day.events[0]
     busy_day.events = [
-        original,
+        original.model_copy(
+            update={"starts_before_segment": True, "ends_after_segment": True}
+        ),
         original.model_copy(update={"view_id": "test-overflow-2"}),
         original.model_copy(update={"view_id": "test-overflow-3"}),
         original.model_copy(update={"view_id": "test-overflow-4"}),
@@ -201,6 +452,8 @@ def test_calendar_overflow_control_exposes_ordered_extra_events() -> None:
     assert '<details class="calendar-overflow">' in rendered
     assert "+1개 더 보기" in rendered
     assert rendered.count('data-source-id=') >= 4
+    assert 'aria-label="이전 날부터 계속">←' in rendered
+    assert 'aria-label="다음 날까지 계속">→' in rendered
 
 
 def test_month_render_handles_required_month_lengths_and_rollover() -> None:
@@ -361,6 +614,7 @@ def test_invalid_table_value_stays_visible_and_cannot_schedule() -> None:
     assert edited.report is not None and edited.report.normalized is not None
     assert result.result is None
     assert "CONFIRMATION_REQUIRED" in result.diagnostics
+    assert "2026년 3월" in result.calendar_html
 
 
 def test_editable_table_count_limits_accept_max_and_reject_max_plus_one() -> None:
