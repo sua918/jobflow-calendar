@@ -77,6 +77,20 @@ def test_calendar_first_contract_defines_responsive_modality_and_step_three() ->
     assert "test at 700/701 px without closing" in ux_contract
 
 
+def test_calendar_first_contract_requires_one_sidebar_path_without_layout_fallback() -> None:
+    design = (ROOT / "DESIGN.md").read_text(encoding="utf-8")
+    ux_contract = (ROOT / "docs" / "calendar-first-ui.md").read_text(
+        encoding="utf-8"
+    )
+
+    for contract in (design, ux_contract):
+        assert "sole approved composition primitive" in contract
+        assert "60dvh" not in contract
+        assert "only approved fallback" not in contract
+
+    assert "There is no approved inline-panel or custom-modal fallback" in ux_contract
+
+
 def test_current_css_palette_stays_guarded_until_redesign_implementation() -> None:
     for token, value in IMPLEMENTED_BASELINE_TOKENS.items():
         assert re.search(rf"{re.escape(token)}:\s*{value}", APP_CSS, re.IGNORECASE)
