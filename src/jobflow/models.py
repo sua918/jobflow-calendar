@@ -213,9 +213,24 @@ class RecurringRoutine(StrictModel):
         return self
 
 
+class SelectedMonth(StrictModel):
+    year: int = Field(ge=1, le=9998)
+    month: int = Field(ge=1, le=12)
+
+
+def month_bounds(selected_month: SelectedMonth) -> tuple[datetime, datetime]:
+    """Return the exact half-open Asia/Seoul range for a selected month."""
+    start = datetime(selected_month.year, selected_month.month, 1, tzinfo=KST)
+    if selected_month.month == 12:
+        end = datetime(selected_month.year + 1, 1, 1, tzinfo=KST)
+    else:
+        end = datetime(selected_month.year, selected_month.month + 1, 1, tzinfo=KST)
+    return start, end
+
+
 class ParseContext(StrictModel):
     reference_datetime: datetime
-    planning_start: date
+    selected_month: SelectedMonth
     timezone: Literal["Asia/Seoul"] = "Asia/Seoul"
 
     @field_validator("reference_datetime")
@@ -251,9 +266,8 @@ class ValidationReport(StrictModel):
 
 
 class ScheduleRequest(StrictModel):
-    planning_start: date
+    selected_month: SelectedMonth
     timezone: Literal["Asia/Seoul"] = "Asia/Seoul"
-    horizon_days: Literal[14] = 14
     slot_minutes: Literal[30] = 30
     daily_work_cap_minutes: int = Field(default=240, gt=0, multiple_of=30)
     deadline_tasks: list[DeadlineTask] = Field(default_factory=list)
@@ -322,3 +336,74 @@ class ScheduleResult(StrictModel):
     diagnostics: list[Diagnostic] = Field(default_factory=list)
     stats: ScheduleStats
     is_fully_scheduled: bool
+
+
+CalendarViewId = Annotated[
+    str,
+    StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,83}$"),
+]
+
+
+class CalendarEventView(StrictModel):
+    view_id: CalendarViewId
+    source_id: SafeId
+    work_id: WorkId | None
+    category: Literal["deadline_task", "recurring_routine", "fixed_event"]
+    category_label_ko: NonBlank
+    title: NonBlank
+    segment_date: date
+    segment_start: datetime
+    segment_end: datetime
+    original_start: datetime
+    original_end: datetime
+    duration_minutes: int = Field(gt=0)
+    starts_before_segment: bool
+    ends_after_segment: bool
+    aria_label_ko: NonBlank
+
+    @field_validator("segment_start", "segment_end", "original_start", "original_end")
+    @classmethod
+    def normalize_datetime(cls, value: datetime) -> datetime:
+        return _to_seoul(value)
+
+    @model_validator(mode="after")
+    def validate_segment(self) -> CalendarEventView:
+        if self.segment_start >= self.segment_end:
+            raise ValueError("calendar segment must have start before end")
+        if self.segment_start.date() != self.segment_date:
+            raise ValueError("calendar segment date must match its start")
+        if self.original_start > self.segment_start or self.segment_end > self.original_end:
+            raise ValueError("calendar segment must be inside its original interval")
+        actual = int((self.segment_end - self.segment_start).total_seconds() // 60)
+        if actual != self.duration_minutes:
+            raise ValueError("calendar segment duration must match its interval")
+        return self
+
+
+class CalendarDayCell(StrictModel):
+    date: date
+    in_selected_month: bool
+    is_today: bool
+    weekday: Weekday
+    events: list[CalendarEventView] = Field(default_factory=list)
+
+
+class CalendarMonthView(StrictModel):
+    selected_month: SelectedMonth
+    timezone: Literal["Asia/Seoul"] = "Asia/Seoul"
+    horizon_start: datetime
+    horizon_end: datetime
+    week_starts_on: Literal["MON"] = "MON"
+    row_count: Literal[5, 6]
+    days: list[CalendarDayCell]
+
+    @field_validator("horizon_start", "horizon_end")
+    @classmethod
+    def normalize_datetime(cls, value: datetime) -> datetime:
+        return _to_seoul(value)
+
+    @model_validator(mode="after")
+    def validate_grid(self) -> CalendarMonthView:
+        if len(self.days) != self.row_count * 7:
+            raise ValueError("calendar grid size must match row count")
+        return self

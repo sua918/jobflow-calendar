@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -13,6 +13,7 @@ from jobflow.models import (
     ParseContext,
     RecurringRoutine,
     ScheduleRequest,
+    SelectedMonth,
     SourceProvenance,
     Weekday,
 )
@@ -139,15 +140,18 @@ def test_policy_defaults_are_recorded_in_provenance() -> None:
 
 def test_parse_context_requires_canonical_seoul_aware_datetime() -> None:
     with pytest.raises(ValidationError):
-        ParseContext(reference_datetime=datetime(2026, 3, 2, 9), planning_start=date(2026, 3, 2))
+        ParseContext(
+            reference_datetime=datetime(2026, 3, 2, 9),
+            selected_month=SelectedMonth(year=2026, month=3),
+        )
     context = ParseContext(
         reference_datetime=datetime.fromisoformat("2026-03-02T09:00:00+09:00"),
-        planning_start=date(2026, 3, 2),
+        selected_month=SelectedMonth(year=2026, month=3),
     )
     assert getattr(context.reference_datetime.tzinfo, "key", None) == "Asia/Seoul"
     context = ParseContext(
         reference_datetime=datetime(2026, 3, 2, 9, tzinfo=KST),
-        planning_start=date(2026, 3, 2),
+        selected_month=SelectedMonth(year=2026, month=3),
     )
     assert context.reference_datetime.tzinfo is KST
 
@@ -155,7 +159,7 @@ def test_parse_context_requires_canonical_seoul_aware_datetime() -> None:
 def test_schedule_request_rejects_misaligned_global_cap() -> None:
     with pytest.raises(ValidationError):
         ScheduleRequest(
-            planning_start=date(2026, 3, 2),
+            selected_month=SelectedMonth(year=2026, month=3),
             daily_work_cap_minutes=45,
             availability=[
                 AvailabilityRule(

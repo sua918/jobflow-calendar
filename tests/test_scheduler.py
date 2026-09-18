@@ -17,6 +17,7 @@ from jobflow.models import (
     ScheduleRequest,
     ScheduleResult,
     ScheduleStats,
+    SelectedMonth,
     SourceProvenance,
     UnscheduledReason,
     UnscheduledWork,
@@ -53,7 +54,7 @@ def available(
 
 def request(**changes: object) -> ScheduleRequest:
     values: dict[str, object] = {
-        "planning_start": date(2026, 3, 2),
+        "selected_month": SelectedMonth(year=2026, month=3),
         "daily_work_cap_minutes": 240,
         "availability": [available()],
     }
@@ -112,7 +113,15 @@ def test_canonical_fixture_is_fully_schedulable_and_obeys_all_invariants() -> No
 
 def test_task_splitting_and_caps_are_enforced() -> None:
     result = build_schedule(
-        request(deadline_tasks=[deadline_task(duration_minutes=180, daily_cap_minutes=60)])
+        request(
+            deadline_tasks=[
+                deadline_task(
+                    duration_minutes=180,
+                    daily_cap_minutes=60,
+                    earliest_start=datetime(2026, 3, 2, 0, tzinfo=KST),
+                )
+            ]
+        )
     )
     task_blocks = [block for block in result.blocks if block.work_id == "task-01"]
     assert [int((block.end - block.start).total_seconds() // 60) for block in task_blocks] == [
@@ -174,9 +183,13 @@ def test_constrained_routine_is_allocated_before_deadline_task() -> None:
 
 
 def test_all_unscheduled_reasons_are_reported_deterministically() -> None:
-    before_horizon = deadline_task(deadline=datetime(2026, 3, 1, 18, tzinfo=KST))
+    before_horizon = deadline_task(deadline=datetime(2026, 3, 1, 0, tzinfo=KST))
     no_availability = deadline_task(id="task-no-avail")
-    fixed_conflict = deadline_task(id="task-fixed", duration_minutes=60)
+    fixed_conflict = deadline_task(
+        id="task-fixed",
+        duration_minutes=60,
+        earliest_start=datetime(2026, 3, 2, 9, tzinfo=KST),
+    )
     cap = deadline_task(
         id="task-cap",
         duration_minutes=60,
@@ -196,6 +209,7 @@ def test_all_unscheduled_reasons_are_reported_deterministically() -> None:
         duration_minutes=120,
         splittable=False,
         max_block_minutes=120,
+        earliest_start=datetime(2026, 3, 2, 9, tzinfo=KST),
     )
     fragmenting_fixed = FixedEvent(
         id="fixed-fragment",
@@ -209,7 +223,7 @@ def test_all_unscheduled_reasons_are_reported_deterministically() -> None:
         (
             request(
                 deadline_tasks=[no_availability],
-                availability=[available({Weekday.SUN}, time(9), time(10))],
+                availability=[available({Weekday.SAT}, time(9), time(10))],
             ),
             UnscheduledReason.NO_AVAILABILITY,
         ),

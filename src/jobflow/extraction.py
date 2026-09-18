@@ -6,7 +6,7 @@ from typing import Any, Protocol, cast
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-from jobflow.models import ExtractionDraft, ParseContext
+from jobflow.models import ExtractionDraft, ParseContext, month_bounds
 
 
 class ExtractionError(RuntimeError):
@@ -38,8 +38,9 @@ def _build_runnable() -> ExtractionRunnable:
             ("system", _SYSTEM_PROMPT),
             (
                 "human",
-                "기준 시각: {reference_datetime}\n계획 시작: {planning_start}\n"
-                "계획 종료(미포함): {horizon_end}\n시간대: {timezone}\n입력:\n{text}",
+                "기준 시각: {reference_datetime}\n선택 월: {selected_month}\n"
+                "계획 시작: {horizon_start}\n계획 종료(미포함): {horizon_end}\n"
+                "시간대: {timezone}\n입력:\n{text}",
             ),
         ]
     )
@@ -80,12 +81,13 @@ async def extract_draft(text: str, context: ParseContext) -> ExtractionDraft:
         raise ExtractionError("일정으로 바꿀 내용을 입력해 주세요.")
     try:
         runnable = _build_runnable()
-        horizon_end = context.planning_start.fromordinal(context.planning_start.toordinal() + 14)
+        horizon_start, horizon_end = month_bounds(context.selected_month)
         raw = await runnable.ainvoke(
             {
                 "text": text,
                 "reference_datetime": context.reference_datetime.isoformat(),
-                "planning_start": context.planning_start.isoformat(),
+                "selected_month": context.selected_month.model_dump(mode="json"),
+                "horizon_start": horizon_start.isoformat(),
                 "horizon_end": horizon_end.isoformat(),
                 "timezone": context.timezone,
             }

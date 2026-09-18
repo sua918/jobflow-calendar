@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date, datetime, time
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -14,6 +14,7 @@ from jobflow.models import (
     LocalTimeWindow,
     ParseContext,
     RecurringRoutine,
+    SelectedMonth,
     SourceProvenance,
     Weekday,
 )
@@ -21,7 +22,7 @@ from jobflow.models import (
 KST = ZoneInfo("Asia/Seoul")
 CONTEXT = ParseContext(
     reference_datetime=datetime(2026, 3, 2, 9, tzinfo=KST),
-    planning_start=date(2026, 3, 2),
+    selected_month=SelectedMonth(year=2026, month=3),
 )
 
 

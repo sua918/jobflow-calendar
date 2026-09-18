@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date, datetime, time
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -15,6 +15,7 @@ from jobflow.models import (
     ScheduleRequest,
     ScheduleResult,
     ScheduleStats,
+    SelectedMonth,
     Severity,
     SourceProvenance,
     Weekday,
@@ -23,7 +24,7 @@ from jobflow.models import (
 KST = ZoneInfo("Asia/Seoul")
 CONTEXT = ParseContext(
     reference_datetime=datetime(2026, 3, 2, 9, tzinfo=KST),
-    planning_start=date(2026, 3, 2),
+    selected_month=SelectedMonth(year=2026, month=3),
 )
 
 
@@ -73,7 +74,9 @@ def test_parse_failure_returns_only_safe_korean_diagnostic(
 
 
 def test_schedule_confirmed_validates_result_and_explains_in_korean() -> None:
-    request = ScheduleRequest(planning_start=date(2026, 3, 2), availability=draft().availability)
+    request = ScheduleRequest(
+        selected_month=CONTEXT.selected_month, availability=draft().availability
+    )
     result = services.schedule_confirmed(request)
     assert result.is_fully_scheduled
     explanation = services.explain_result_ko(result)
@@ -85,7 +88,9 @@ def test_schedule_confirmed_validates_result_and_explains_in_korean() -> None:
 def test_schedule_confirmed_rejects_internal_invalid_result(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    request = ScheduleRequest(planning_start=date(2026, 3, 2), availability=draft().availability)
+    request = ScheduleRequest(
+        selected_month=CONTEXT.selected_month, availability=draft().availability
+    )
     malformed = ScheduleResult(
         stats=ScheduleStats(requested_minutes=0, scheduled_minutes=0, unscheduled_minutes=0),
         is_fully_scheduled=True,

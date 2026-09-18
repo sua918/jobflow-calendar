@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from jobflow.models import (
@@ -18,6 +18,7 @@ from jobflow.models import (
     UnscheduledWork,
     Weekday,
     WorkKind,
+    month_bounds,
 )
 
 KST = ZoneInfo("Asia/Seoul")
@@ -30,8 +31,7 @@ def _block_id(work_id: str, sequence: int) -> str:
 
 
 def _horizon(request: ScheduleRequest) -> tuple[datetime, datetime]:
-    start = datetime.combine(request.planning_start, time.min, KST)
-    return start, start + timedelta(days=request.horizon_days)
+    return month_bounds(request.selected_month)
 
 
 def _overlaps(start: datetime, end: datetime, other_start: datetime, other_end: datetime) -> bool:
@@ -41,8 +41,9 @@ def _overlaps(start: datetime, end: datetime, other_start: datetime, other_end: 
 def _availability_slots(request: ScheduleRequest, *, subtract_fixed: bool) -> set[datetime]:
     horizon_start, horizon_end = _horizon(request)
     slots: set[datetime] = set()
-    for offset in range(request.horizon_days):
-        day = request.planning_start + timedelta(days=offset)
+    day_count = (horizon_end.date() - horizon_start.date()).days
+    for offset in range(day_count):
+        day = horizon_start.date() + timedelta(days=offset)
         weekday = WEEKDAYS[day.weekday()]
         for rule in request.availability:
             if weekday not in rule.weekdays:
@@ -107,7 +108,7 @@ def _unscheduled(
 ) -> UnscheduledWork:
     messages = {
         UnscheduledReason.CONFIRMATION_REQUIRED: "중요한 항목의 사용자 확인이 필요해요.",
-        UnscheduledReason.OUTSIDE_HORIZON: "작업이 2주 계획 범위 밖에 있어요.",
+        UnscheduledReason.OUTSIDE_HORIZON: "작업이 선택한 달의 계획 범위 밖에 있어요.",
         UnscheduledReason.NO_AVAILABILITY: "조건에 맞는 가능한 시간이 없어요.",
         UnscheduledReason.NO_CAPACITY_BEFORE_DEADLINE: "마감 전 남은 시간이 부족해요.",
         UnscheduledReason.NO_MATCHING_ROUTINE_WINDOW: "반복 일정의 허용 시간에 빈 구간이 없어요.",
@@ -218,8 +219,10 @@ def _task_candidates(
 
 
 def _routine_occurrences(routine: RecurringRoutine, request: ScheduleRequest) -> list[date]:
-    start = max(request.planning_start, routine.start_date or request.planning_start)
-    horizon_last = request.planning_start + timedelta(days=request.horizon_days - 1)
+    horizon_start, horizon_end = _horizon(request)
+    first_day = horizon_start.date()
+    horizon_last = horizon_end.date() - timedelta(days=1)
+    start = max(first_day, routine.start_date or first_day)
     end = min(horizon_last, routine.end_date or horizon_last)
     if start > end:
         return []
@@ -231,8 +234,10 @@ def _routine_occurrences(routine: RecurringRoutine, request: ScheduleRequest) ->
 
 
 def _routine_intersects_horizon(routine: RecurringRoutine, request: ScheduleRequest) -> bool:
-    horizon_last = request.planning_start + timedelta(days=request.horizon_days - 1)
-    start = max(request.planning_start, routine.start_date or request.planning_start)
+    horizon_start, horizon_end = _horizon(request)
+    first_day = horizon_start.date()
+    horizon_last = horizon_end.date() - timedelta(days=1)
+    start = max(first_day, routine.start_date or first_day)
     end = min(horizon_last, routine.end_date or horizon_last)
     return start <= end
 
@@ -503,27 +508,28 @@ def build_schedule(request: ScheduleRequest) -> ScheduleResult:
     for routine in request.recurring_routines:
         dates = _routine_occurrences(routine, request)
         if not dates and not _routine_intersects_horizon(routine, request):
-            requested_total += routine.duration_minutes
-            unscheduled.append(
-                _unscheduled(
-                    work_id=routine.id,
-                    title=routine.title,
-                    kind=WorkKind.RECURRING_ROUTINE,
-                    reason=UnscheduledReason.OUTSIDE_HORIZON,
-                    requested=routine.duration_minutes,
-                    scheduled=0,
+            schedule_diagnostics.append(
+                Diagnostic(
+                    code="OUTSIDE_HORIZON",
+                    severity=Severity.WARNING,
+                    message_ko="반복 일정의 날짜 범위가 선택한 달과 겹치지 않아요.",
+                    entity_id=routine.id,
                     details={
                         "horizon_start": horizon_start.isoformat(),
                         "horizon_end": horizon_end.isoformat(),
                     },
                 )
             )
-            optional = _optional_routine_diagnostic(
-                routine, UnscheduledReason.OUTSIDE_HORIZON, None
+        elif not dates:
+            schedule_diagnostics.append(
+                Diagnostic(
+                    code="NO_OCCURRENCE_IN_SELECTED_MONTH",
+                    severity=Severity.INFO,
+                    message_ko="선택한 달에 해당하는 반복 일정 요일이 없어요.",
+                    entity_id=routine.id,
+                )
             )
-            if optional:
-                schedule_diagnostics.append(optional)
-        elif dates:
+        else:
             requested_total += len(dates) * routine.duration_minutes
 
     blocks.sort(key=lambda block: (block.start, block.end, block.id))
@@ -577,10 +583,7 @@ def _expected_requested_minutes(request: ScheduleRequest) -> int:
     total = sum(task.duration_minutes for task in request.deadline_tasks)
     for routine in request.recurring_routines:
         occurrences = _routine_occurrences(routine, request)
-        if occurrences:
-            total += len(occurrences) * routine.duration_minutes
-        elif not _routine_intersects_horizon(routine, request):
-            total += routine.duration_minutes
+        total += len(occurrences) * routine.duration_minutes
     return total
 
 
@@ -715,11 +718,7 @@ def validate_schedule(request: ScheduleRequest, result: ScheduleResult) -> list[
 
     for routine in request.recurring_routines:
         occurrence_dates = _routine_occurrences(routine, request)
-        expected_dates: list[date | None] = []
-        expected_dates.extend(occurrence_dates)
-        if not expected_dates and not _routine_intersects_horizon(routine, request):
-            expected_dates.append(None)
-        for occurrence_date in expected_dates:
+        for occurrence_date in occurrence_dates:
             actual = sum(
                 _duration(block.start, block.end)
                 for block in result.blocks

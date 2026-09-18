@@ -21,10 +21,12 @@ from jobflow.models import (
     ParseContext,
     RecurringRoutine,
     ScheduleResult,
+    SelectedMonth,
     Severity,
     SourceProvenance,
     ValidationReport,
     Weekday,
+    month_bounds,
 )
 from jobflow.services import (
     InternalScheduleError,
@@ -272,11 +274,11 @@ def _diagnostics_text(diagnostics: list[Diagnostic]) -> str:
 
 
 def _context_text(context: ParseContext) -> str:
-    horizon_end = context.planning_start.fromordinal(context.planning_start.toordinal() + 14)
+    horizon_start, horizon_end = month_bounds(context.selected_month)
     return (
         f"기준 시각: {_format_datetime(context.reference_datetime)} KST\n\n"
-        f"계획 범위: {context.planning_start.isoformat()} ~ {horizon_end.isoformat()} 미만\n\n"
-        "시간대: Asia/Seoul · 30분 격자 · 14일"
+        f"계획 범위: {horizon_start.date().isoformat()} ~ {horizon_end.date().isoformat()} 미만\n\n"
+        "시간대: Asia/Seoul · 30분 격자 · 선택한 달"
     )
 
 
@@ -296,9 +298,10 @@ def _view_from_report(report: ValidationReport) -> ReviewView:
 
 
 def _safe_error_view(message: str, context: ParseContext | None = None) -> ReviewView:
+    now = datetime.now(KST).replace(second=0, microsecond=0)
     visible_context = context or ParseContext(
-        reference_datetime=datetime.now(KST).replace(second=0, microsecond=0),
-        planning_start=datetime.now(KST).date(),
+        reference_datetime=now,
+        selected_month=SelectedMonth(year=now.year, month=now.month),
     )
     return ReviewView(
         report_json="",
@@ -351,9 +354,10 @@ def _invalid_edit_view(
 
 async def parse_input(text: str, reference_datetime: str, planning_start: str) -> ReviewView:
     try:
+        selected_date = _parse_date(planning_start)
         context = ParseContext(
             reference_datetime=_parse_datetime(reference_datetime),
-            planning_start=_parse_date(planning_start),
+            selected_month=SelectedMonth(year=selected_date.year, month=selected_date.month),
         )
     except (ValueError, ValidationError):
         return _safe_error_view("기준 시각과 계획 시작일 형식을 확인해 주세요.")
@@ -698,9 +702,10 @@ def _begin_parse() -> tuple[object, ...]:
 
 def invalidate_input(reference_datetime: str, planning_start: str) -> ReviewView:
     try:
+        selected_date = _parse_date(planning_start)
         context = ParseContext(
             reference_datetime=_parse_datetime(reference_datetime),
-            planning_start=_parse_date(planning_start),
+            selected_month=SelectedMonth(year=selected_date.year, month=selected_date.month),
         )
         context_text = _context_text(context)
     except (ValueError, ValidationError):
@@ -801,7 +806,10 @@ def build_blocks() -> gr.Blocks:
                 )
                 context_box = gr.Markdown(
                     _context_text(
-                        ParseContext(reference_datetime=now, planning_start=now.date())
+                        ParseContext(
+                            reference_datetime=now,
+                            selected_month=SelectedMonth(year=now.year, month=now.month),
+                        )
                     ),
                     label="기준 컨텍스트",
                 )

@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -12,6 +12,7 @@ from jobflow.models import (
     LocalTimeWindow,
     ParseContext,
     RecurringRoutine,
+    SelectedMonth,
     SourceProvenance,
     Weekday,
 )
@@ -20,7 +21,7 @@ from jobflow.validation import ConfirmationRequiredError, to_schedule_request, v
 KST = ZoneInfo("Asia/Seoul")
 CONTEXT = ParseContext(
     reference_datetime=datetime(2026, 3, 2, 9, tzinfo=KST),
-    planning_start=date(2026, 3, 2),
+    selected_month=SelectedMonth(year=2026, month=3),
 )
 
 
@@ -65,7 +66,7 @@ def test_valid_draft_becomes_request_without_mutating_input() -> None:
     restored = type(report).model_validate_json(report.model_dump_json())
     assert restored.context == CONTEXT
     request = to_schedule_request(report, daily_work_cap_minutes=180)
-    assert request.planning_start == CONTEXT.planning_start
+    assert request.selected_month == CONTEXT.selected_month
     assert request.daily_work_cap_minutes == 180
 
 
@@ -74,7 +75,7 @@ def test_request_uses_only_public_serialized_report_context() -> None:
         ExtractionDraft(deadline_tasks=[task()], availability=[availability()]), CONTEXT
     )
     restored = type(report).model_validate_json(report.model_dump_json())
-    assert to_schedule_request(restored).planning_start == CONTEXT.planning_start
+    assert to_schedule_request(restored).selected_month == CONTEXT.selected_month
 
 
 def test_confirmation_and_missing_availability_block_scheduling() -> None:

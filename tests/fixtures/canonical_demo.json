@@ -1,7 +1,7 @@
 {
   "context": {
     "reference_datetime": "2026-03-02T09:00:00+09:00",
-    "planning_start": "2026-03-02",
+    "selected_month": {"year": 2026, "month": 3},
     "timezone": "Asia/Seoul"
   },
   "draft": {

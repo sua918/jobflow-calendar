@@ -14,6 +14,8 @@ from jobflow.models import (
     Severity,
     SourceProvenance,
     ValidationReport,
+    Weekday,
+    month_bounds,
 )
 
 KST = ZoneInfo("Asia/Seoul")
@@ -142,6 +144,101 @@ def _duration_diagnostics(task: DeadlineTask | RecurringRoutine) -> list[Diagnos
     ]
 
 
+def _selected_month_diagnostics(
+    draft: ExtractionDraft, context: ParseContext
+) -> list[Diagnostic]:
+    diagnostics: list[Diagnostic] = []
+    horizon_start, horizon_end = month_bounds(context.selected_month)
+    first_day = horizon_start.date()
+    last_day = horizon_end.date().fromordinal(horizon_end.date().toordinal() - 1)
+
+    has_in_month_availability = False
+    for rule in draft.availability:
+        range_start = rule.valid_from or first_day
+        range_end = rule.valid_through or last_day
+        if range_end < first_day or range_start > last_day:
+            diagnostics.append(
+                _diagnostic(
+                    "OUTSIDE_HORIZON",
+                    "가능 시간의 날짜 범위가 선택한 달과 겹치지 않아요.",
+                    entity_id=rule.id,
+                    severity=Severity.WARNING,
+                )
+            )
+            continue
+        clipped_start = max(range_start, first_day)
+        clipped_end = min(range_end, last_day)
+        has_matching_day = any(
+            list(Weekday)[day.weekday()] in rule.weekdays
+            for ordinal in range(clipped_start.toordinal(), clipped_end.toordinal() + 1)
+            for day in [clipped_start.fromordinal(ordinal)]
+        )
+        has_in_month_availability = has_in_month_availability or has_matching_day
+        if range_start < first_day or range_end > last_day:
+            diagnostics.append(
+                _diagnostic(
+                    "AVAILABILITY_CLIPPED_TO_HORIZON",
+                    "가능 시간의 날짜 범위를 선택한 달에 맞춰 사용해요.",
+                    entity_id=rule.id,
+                    severity=Severity.INFO,
+                )
+            )
+
+    if draft.availability and not has_in_month_availability:
+        diagnostics.append(
+            _diagnostic("NO_AVAILABILITY", "선택한 달에 사용할 수 있는 시간이 없어요.")
+        )
+
+    for routine in draft.recurring_routines:
+        range_start = max(first_day, routine.start_date or first_day)
+        range_end = min(last_day, routine.end_date or last_day)
+        if range_start > range_end:
+            diagnostics.append(
+                _diagnostic(
+                    "OUTSIDE_HORIZON",
+                    "반복 일정의 날짜 범위가 선택한 달과 겹치지 않아요.",
+                    entity_id=routine.id,
+                    severity=Severity.WARNING,
+                )
+            )
+            continue
+        has_occurrence = any(
+            list(Weekday)[day.weekday()] in routine.weekdays
+            for ordinal in range(range_start.toordinal(), range_end.toordinal() + 1)
+            for day in [range_start.fromordinal(ordinal)]
+        )
+        if not has_occurrence:
+            diagnostics.append(
+                _diagnostic(
+                    "NO_OCCURRENCE_IN_SELECTED_MONTH",
+                    "선택한 달에 해당하는 반복 일정 요일이 없어요.",
+                    entity_id=routine.id,
+                    severity=Severity.INFO,
+                )
+            )
+
+    for event in draft.fixed_events:
+        if event.end <= horizon_start or event.start >= horizon_end:
+            diagnostics.append(
+                _diagnostic(
+                    "OUTSIDE_HORIZON",
+                    "고정 일정이 선택한 달과 겹치지 않아요.",
+                    entity_id=event.id,
+                    severity=Severity.WARNING,
+                )
+            )
+        elif event.start < horizon_start or event.end > horizon_end:
+            diagnostics.append(
+                _diagnostic(
+                    "FIXED_EVENT_CLIPPED_TO_HORIZON",
+                    "고정 일정 중 선택한 달과 겹치는 구간만 사용해요.",
+                    entity_id=event.id,
+                    severity=Severity.INFO,
+                )
+            )
+    return diagnostics
+
+
 def validate_draft(draft: ExtractionDraft, context: ParseContext) -> ValidationReport:
     """Validate cross-model scheduling invariants without repairing user meaning."""
     diagnostics: list[Diagnostic] = []
@@ -166,6 +263,8 @@ def validate_draft(draft: ExtractionDraft, context: ParseContext) -> ValidationR
 
     if not draft.availability:
         diagnostics.append(_diagnostic("NO_AVAILABILITY", "가능한 시간을 하나 이상 입력해 주세요."))
+
+    diagnostics.extend(_selected_month_diagnostics(draft, context))
 
     for task in draft.deadline_tasks:
         diagnostics.extend(_duration_diagnostics(task))
@@ -247,7 +346,7 @@ def to_schedule_request(
         raise ValueError("daily_work_cap_minutes must be a positive 30-minute multiple")
     draft = report.normalized
     return ScheduleRequest(
-        planning_start=report.context.planning_start,
+        selected_month=report.context.selected_month,
         daily_work_cap_minutes=daily_work_cap_minutes,
         deadline_tasks=draft.deadline_tasks,
         recurring_routines=draft.recurring_routines,
