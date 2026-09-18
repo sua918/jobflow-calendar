@@ -266,7 +266,7 @@ Stable diagnostic codes include `EXTRACTION_FAILED`, `SCHEMA_INVALID`, `CONFIRMA
 
 ## 6. LangChain boundary and ambiguity policy
 
-Use a small LCEL chain equivalent to:
+LangChain/OpenAI is an optional runtime extraction adapter, not a build-time or test-time dependency on live credentials. When a user explicitly invokes Parse with their own project-local runtime key, use a small LCEL chain equivalent to:
 
 ```python
 prompt | ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-4.1-mini"), temperature=0).with_structured_output(ExtractionDraft)
@@ -274,11 +274,11 @@ prompt | ChatOpenAI(model=os.environ.get("OPENAI_MODEL", "gpt-4.1-mini"), temper
 
 The prompt receives the exact user text, `reference_datetime`, horizon dates, timezone, and the documented defaults. It must quote input evidence into each `SourceProvenance`, put uncertain field paths in `uncertain_fields`, and never fabricate missing deadlines, duration, recurrence days, or availability. There is no agent, tool loop, memory, or second model call on the scheduling path.
 
-`extract_draft` catches provider/network/refusal/structured-output failures at the boundary and maps them to the service-level `EXTRACTION_FAILED` diagnostic; logs must not include the user's raw text or API key. Tests inject a fake runnable and make no network calls.
+`extract_draft` catches provider/network/refusal/structured-output failures at the boundary and maps them to the service-level `EXTRACTION_FAILED` diagnostic; logs must not include the user's raw text or API key. Automated tests inject deterministic fake structured outputs and make no live provider or network calls. The canonical fixture and its complete parse/review/schedule path must work without any API key.
 
 A deterministic Korean template in `explain_result_ko` is the required explanation path and is generated solely from `ScheduleResult`. A future optional LLM rephrase may receive only the already-computed summary, may not change facts, and must fall back to the deterministic text. It is not part of MVP acceptance.
 
-If no `OPENAI_API_KEY` is configured, the UI remains launchable and shows a clear extraction-unavailable message; users may still load/edit the canonical structured demo. No key is embedded or sent to the browser.
+If no `OPENAI_API_KEY` is configured, the UI remains launchable and shows a clear extraction-unavailable message; users may still load/edit the canonical structured demo. No key is embedded or sent to the browser. Implementation and testing must not use a class/shared OpenAI API key, and the repository, project environment, fixtures, and test harness must not receive, copy, or derive Hermes/Codex OAuth credentials.
 
 ## 7. Scheduling policy
 
@@ -315,7 +315,7 @@ Callbacks return explicit view-model tuples; they do not mutate module globals. 
 
 Expected user/provider errors become `Diagnostic` entries and Korean UI messages. Programming invariant failures raise an internal exception, are logged without raw user text, and become generic `INTERNAL_SCHEDULE_INVALID` at the UI boundary. Do not expose stack traces or provider payloads in Gradio.
 
-`.env` is local-only and listed in `.gitignore`; commit only `.env.example` containing blank `OPENAI_API_KEY=` and `OPENAI_MODEL=gpt-4.1-mini`. Load with `python-dotenv` in `app.py`. Never log, serialize to Gradio state, commit, or return the key. Also ignore `.venv/`, `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `htmlcov/`, `.coverage`, `__pycache__/`, and generated output.
+`.env` is local-only and listed in `.gitignore`; commit only `.env.example` containing blank `OPENAI_API_KEY=` and `OPENAI_MODEL=gpt-4.1-mini`. Load an end user's project-local runtime key with `python-dotenv` in `app.py`; do not provision or borrow a class/shared key. Never import Hermes/Codex OAuth into the project, and never log, serialize to Gradio state, commit, or return any credential. Also ignore `.venv/`, `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `htmlcov/`, `.coverage`, `__pycache__/`, and generated output.
 
 The Korean task text is sent to the configured OpenAI API only when Parse is clicked. Display this disclosure beside the button. Nothing is stored by JobFlow. Keep to one extraction call per click; disable double submission while running. Scheduling and explanation incur no API cost. Tests always use fakes.
 
@@ -358,7 +358,7 @@ Use project-local cache variables during install/test when applicable, for examp
 - **Models**: every boundary, timezone, grid, enum, uniqueness, and discriminated-kind rule; extra fields rejected.
 - **Validation**: relative-date context, confidence/uncertainty gating, defaults/provenance, overlapping availability union, fixed-event warnings, deterministic work-ID length rejection, and `ValidationReport` Pydantic JSON/Gradio-state round trips that preserve `context`.
 - **Scheduler unit/property tests**: zero overlap; availability containment; fixed-event exclusion; deadline compliance; recurrence day/window; deterministic output for identical input; split/min/max/daily caps; stable ordering; exact statistics; each infeasibility reason.
-- **Extraction contract**: fake LCEL runnable returns structured Korean examples; malformed/refused/provider failure maps to a diagnostic; no live API in CI.
+- **Extraction contract**: deterministic fake LCEL runnable outputs structured Korean examples; malformed/refused/provider failure maps to a diagnostic; no live API, class/shared key, or Hermes/Codex OAuth is used in automated tests or CI.
 - **Service integration**: draft -> confirmation -> request -> result; edits invalidate confirmation; validator catches a deliberately malformed result.
 - **UI smoke**: `build_app()` constructs without a key; canonical structured demo can schedule; missing-key Parse has a safe message. QA launches the app on loopback, verifies real HTTP readiness, and exercises the canonical and infeasible cases.
 
