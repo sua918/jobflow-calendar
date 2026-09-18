@@ -1,0 +1,77 @@
+{
+  "context": {
+    "reference_datetime": "2026-03-02T09:00:00+09:00",
+    "planning_start": "2026-03-02",
+    "timezone": "Asia/Seoul"
+  },
+  "draft": {
+    "deadline_tasks": [
+      {
+        "kind": "deadline_task",
+        "id": "task-01",
+        "title": "포트폴리오 다듬기",
+        "duration_minutes": 360,
+        "deadline": "2026-03-13T22:00:00+09:00",
+        "priority": 4,
+        "splittable": true,
+        "min_block_minutes": 30,
+        "max_block_minutes": 120,
+        "daily_cap_minutes": 120,
+        "preferred_windows": [],
+        "provenance": {"source_text": "포트폴리오를 다듬는 데 총 6시간", "extraction_method": "user", "confidence": 1.0, "uncertain_fields": [], "assumptions": []}
+      },
+      {
+        "kind": "deadline_task",
+        "id": "task-02",
+        "title": "코딩 테스트 준비",
+        "duration_minutes": 240,
+        "deadline": "2026-03-10T18:00:00+09:00",
+        "priority": 5,
+        "splittable": true,
+        "min_block_minutes": 60,
+        "max_block_minutes": 60,
+        "daily_cap_minutes": 240,
+        "preferred_windows": [],
+        "provenance": {"source_text": "코딩 테스트 준비 4시간", "extraction_method": "user", "confidence": 1.0, "uncertain_fields": [], "assumptions": []}
+      }
+    ],
+    "recurring_routines": [
+      {
+        "kind": "recurring_routine",
+        "id": "routine-01",
+        "title": "면접 연습",
+        "duration_minutes": 60,
+        "weekdays": ["MON", "WED", "FRI"],
+        "window": {"start": "19:00:00", "end": "21:00:00"},
+        "start_date": "2026-03-02",
+        "end_date": "2026-03-13",
+        "priority": 3,
+        "required": true,
+        "provenance": {"source_text": "매주 월·수·금 저녁 7시부터 9시", "extraction_method": "user", "confidence": 1.0, "uncertain_fields": [], "assumptions": []}
+      }
+    ],
+    "availability": [
+      {
+        "id": "availability-01",
+        "weekdays": ["MON", "TUE", "WED", "THU", "FRI"],
+        "window": {"start": "19:00:00", "end": "22:00:00"},
+        "provenance": {"source_text": "평일 저녁 7시부터 10시", "extraction_method": "user", "confidence": 1.0, "uncertain_fields": [], "assumptions": []}
+      },
+      {
+        "id": "availability-02",
+        "weekdays": ["SAT"],
+        "window": {"start": "09:00:00", "end": "12:00:00"},
+        "provenance": {"source_text": "토요일 오전 9시부터 12시", "extraction_method": "user", "confidence": 1.0, "uncertain_fields": [], "assumptions": []}
+      }
+    ],
+    "fixed_events": [
+      {
+        "id": "fixed-01",
+        "title": "스터디",
+        "start": "2026-03-04T19:00:00+09:00",
+        "end": "2026-03-04T20:00:00+09:00",
+        "provenance": {"source_text": "3월 4일 저녁 7시부터 8시는 스터디", "extraction_method": "user", "confidence": 1.0, "uncertain_fields": [], "assumptions": []}
+      }
+    ]
+  }
+}
