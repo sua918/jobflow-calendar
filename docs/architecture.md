@@ -62,7 +62,8 @@ Likely collision hotspots are `models.py`, `services.py`, `ui.py`, `pyproject.to
 - Intervals are half-open: `[start, end)`. Therefore one block ending when another begins does not overlap.
 - `planning_start` is a Seoul local `date`. The horizon is `[planning_start 00:00, planning_start + 14 days 00:00)`.
 - `horizon_days` is exactly 14 and `slot_minutes` is exactly 30 in the MVP. Starts, ends, deadlines, durations, and time-window boundaries must align to a 30-minute grid. The only exception is raw LLM draft text, which cannot enter the scheduler until corrected/normalized and confirmed.
-- IDs are stable, UI-safe strings matching `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`. Extraction creates deterministic IDs in input order (`task-01`, `routine-01`, `fixed-01`); edits preserve them.
+- IDs are stable, UI-safe strings. All IDs use the character rule `^[A-Za-z0-9][A-Za-z0-9_-]*$`. `DeadlineTask.id` and `RecurringRoutine.id` are work-item IDs and must contain at most 48 characters because they are embedded verbatim in generated block IDs. Every other ID contains at most 64 characters. Extraction creates deterministic IDs in input order (`task-01`, `routine-01`, `fixed-01`); edits preserve them.
+- A generated schedule-block ID is exactly `block-{work_id}-{sequence:02d}`: `sequence` is decimal, starts at 1 independently for each work item, has a minimum width of two digits (`01` through `99`), and expands normally at `100`; neither `work_id` nor the ID may be truncated, hashed, or otherwise rewritten. The 14-day/30-minute horizon contains at most 672 slots, so a work item can produce at most 672 blocks and its sequence uses at most three digits. A 48-character work-item ID therefore yields a generated ID of at most 58 characters, within the global 64-character ceiling.
 
 ## 4. Normative shared models
 
@@ -122,7 +123,7 @@ class FixedEvent(BaseModel):
 
 class DeadlineTask(BaseModel):
     kind: Literal["deadline_task"] = "deadline_task"
-    id: str
+    id: str                           # work-item ID; 1..48 characters
     title: str
     duration_minutes: int
     deadline: datetime
@@ -137,7 +138,7 @@ class DeadlineTask(BaseModel):
 
 class RecurringRoutine(BaseModel):
     kind: Literal["recurring_routine"] = "recurring_routine"
-    id: str
+    id: str                           # work-item ID; 1..48 characters
     title: str
     duration_minutes: int             # per occurrence
     weekdays: set[Weekday]
@@ -171,6 +172,7 @@ class ValidationReport(BaseModel):
     normalized: ExtractionDraft | None
     diagnostics: list[Diagnostic]
     ready_to_schedule: bool
+    context: ParseContext              # required, public, JSON-serializable
 
 class ScheduleRequest(BaseModel):
     planning_start: date
@@ -184,8 +186,8 @@ class ScheduleRequest(BaseModel):
     fixed_events: list[FixedEvent] = []
 
 class ScheduleBlock(BaseModel):
-    id: str                           # block-{work_id}-{01-based sequence}
-    work_id: str
+    id: str                           # exact block-{work_id}-{sequence:02d}
+    work_id: str                      # verbatim DeadlineTask/RecurringRoutine ID
     title: str
     kind: BlockKind
     start: datetime
@@ -239,13 +241,13 @@ def schedule_confirmed(request: ScheduleRequest) -> ScheduleResult: ...
 def explain_result_ko(result: ScheduleResult) -> str: ...
 ```
 
-`to_schedule_request` raises `ConfirmationRequiredError` if `ready_to_schedule` is false. `schedule_confirmed` must run `validate_schedule` and treat any error-severity diagnostic as an internal correctness failure rather than showing an apparently valid plan.
+`validate_draft(draft, context)` deep-copies the supplied `ParseContext` into the required public `ValidationReport.context` field. The report, including its context, must survive a Pydantic `model_dump_json()` / `model_validate_json()` round trip. `to_schedule_request` raises `ConfirmationRequiredError` if `ready_to_schedule` is false and obtains `ScheduleRequest.planning_start` solely from `report.context.planning_start`; private attributes, module globals, closure state, or another in-process context cache are not valid sources. `schedule_confirmed` must run `validate_schedule` and treat any error-severity diagnostic as an internal correctness failure rather than showing an apparently valid plan.
 
 ## 5. Deterministic validation invariants
 
 Validation returns diagnostics for expected input problems; it does not silently repair meaning.
 
-1. IDs are unique across tasks, routines, availability, and fixed events.
+1. IDs are unique across tasks, routines, availability, and fixed events. Validation deterministically rejects a `DeadlineTask.id` or `RecurringRoutine.id` longer than 48 characters at model construction, before scheduling, and rejects every other ID longer than 64 characters. Generated block IDs retain the exact `block-{work_id}-{sequence:02d}` form and are also validated against the 64-character ceiling.
 2. Titles and provenance `source_text` are nonblank.
 3. Confidence is in `[0, 1]`; priority is 1..5.
 4. Every duration/cap/block bound is positive and divisible by 30. `min_block_minutes <= max_block_minutes <= daily_cap_minutes`. For non-splittable work, duration must fit both `max_block_minutes` and `daily_cap_minutes`.
@@ -285,21 +287,21 @@ Decision: implement a transparent greedy scheduler, not OR-Tools, for the 1.5-da
 Normative algorithm:
 
 1. Expand availability into unique 30-minute slots within the horizon. Subtract the union of fixed-event intervals. Track the global scheduled-work minutes per local day.
-2. Schedule deadline tasks first because their deadlines are hard. Sort by `(deadline ascending, priority descending, id ascending)`.
-3. For each task, consider slots at/after `earliest_start` (or horizon start), strictly before/equal to its deadline, and inside availability. Preferred windows are soft: candidate free runs inside a preferred window sort before nonpreferred runs; ties sort by start datetime ascending.
-4. Non-splittable work requires one contiguous run for its full duration. Splittable work uses deterministic chunks no larger than `max_block_minutes`, no smaller than `min_block_minutes`, and never leaves a positive remainder smaller than `min_block_minutes`. Among equal candidates, choose the longest legal chunk, then the earliest start. Enforce the task-specific and global daily caps before committing each chunk.
-5. Generate one routine occurrence for every matching weekday/local date intersecting the routine date range and horizon. After task placement, sort occurrences by `(occurrence_date ascending, priority descending, routine id ascending)`. An occurrence must be one contiguous block entirely inside both its hard `window` and availability and must respect the global daily cap. Pick the earliest legal start. `required=false` changes message severity to warning but does not change placement order.
+2. Before allocating deadline work, deterministically materialize one constrained routine occurrence for every matching weekday/local date intersecting each routine's date range and the horizon. Sort all materialized occurrences by `(occurrence_date ascending, priority descending, routine id ascending)`.
+3. Allocate the sorted routine occurrences first. Each occurrence is one contiguous block entirely inside both its hard `window` and availability, respects the global daily cap, and uses the earliest feasible grid-aligned start. `required=false` changes message severity to warning but does not change materialization or placement order.
+4. After routine allocation, schedule deadline tasks. Sort tasks by `(deadline ascending, priority descending, id ascending)`; priority never overrides an earlier deadline. For each task, consider slots at/after `earliest_start` (or horizon start), ending no later than its deadline, and inside availability. Preferred windows are soft: candidate free runs inside a preferred window sort before nonpreferred runs.
+5. Non-splittable work requires one contiguous run for its full duration. Splittable work uses deterministic chunks no larger than `max_block_minutes`, no smaller than `min_block_minutes`, and never leaves a positive remainder smaller than `min_block_minutes`. Within each preferred-window status, choose the longest legal chunk, then the earliest start; these rules preserve deterministic earliest-deadline/start and ID tie-breakers inside the task phase. Enforce the task-specific and global daily caps before committing each chunk.
 6. Never move/delete fixed events or already placed blocks to make a later item fit. Never place work outside availability, the horizon, a deadline, or a routine window.
 7. For every partial/failed task or occurrence, append one `UnscheduledWork` with exact requested/scheduled/remaining minutes and the most specific reason. Use capacity calculations in `details` (for example available minutes before deadline and cap-limited minutes); do not claim only “failed”. A partially scheduled deadline task still makes `is_fully_scheduled=false`.
-8. Sort final blocks by `(start, end, id)` and unscheduled entries by `(work_id, occurrence_date or date.min, reason)`. Compute stats from requested occurrences and actual blocks, then call `validate_schedule`.
+8. Sort final blocks by `(start, end, id)` and unscheduled entries by `(work_id, occurrence_date or date.min, reason)`. Compute stats from all requested task minutes and materialized routine occurrences plus actual blocks, then call `validate_schedule`.
 
-Priority never overrides an earlier hard deadline. Preferred task times are soft and may be violated to meet a deadline; routine windows are hard. Fixed events and all generated blocks are hard non-overlap constraints. The overall daily cap counts only generated task/routine minutes; fixed events merely remove capacity.
+Allocating constrained routine occurrences before deadline tasks is the normative constrained-first exception and refinement to the product's shorthand “deadline-first” description: deadline-first ordering applies inside the deadline-task phase, after hard-window routine capacity has been reserved. Preferred task times are soft and may be violated to meet a deadline; routine windows are hard. Fixed events and all generated blocks are hard non-overlap constraints. The overall daily cap counts only generated task/routine minutes; fixed events merely remove capacity.
 
 This greedy policy is complete with respect to reporting, not globally optimal. The UI must say “규칙 기반 일정” rather than “최적 일정”. The known risk is that an alternative rearrangement could schedule more work; `UnscheduledWork` makes that limitation explicit.
 
 ## 8. Gradio event and data flow
 
-Use `gr.Blocks` with server-side Pydantic JSON in `gr.State`; Dataframes are editable projections, not the source of truth.
+Use `gr.Blocks` with server-side Pydantic JSON in `gr.State`; Dataframes are editable projections, not the source of truth. Store and restore the complete `ValidationReport`, including its required public `context`, through Pydantic JSON so a Gradio event round trip cannot lose `ParseContext`.
 
 1. **Parse**: user text + visible reference datetime/planning start -> `parse_for_review` -> editable task, routine, availability, and fixed-event tables plus diagnostics. Disable Schedule.
 2. **Review/edit**: every table change rebuilds an `ExtractionDraft`, sets edited fields to user provenance, and calls `validate_draft`. Render field-level Korean diagnostics. Enable Schedule only when `ready_to_schedule=true` and the user checks an explicit “검토 완료” checkbox.
@@ -354,7 +356,7 @@ Use project-local cache variables during install/test when applicable, for examp
 ## 11. Testing layers and acceptance properties
 
 - **Models**: every boundary, timezone, grid, enum, uniqueness, and discriminated-kind rule; extra fields rejected.
-- **Validation**: relative-date context, confidence/uncertainty gating, defaults/provenance, overlapping availability union, fixed-event warnings, and table round trips.
+- **Validation**: relative-date context, confidence/uncertainty gating, defaults/provenance, overlapping availability union, fixed-event warnings, deterministic work-ID length rejection, and `ValidationReport` Pydantic JSON/Gradio-state round trips that preserve `context`.
 - **Scheduler unit/property tests**: zero overlap; availability containment; fixed-event exclusion; deadline compliance; recurrence day/window; deterministic output for identical input; split/min/max/daily caps; stable ordering; exact statistics; each infeasibility reason.
 - **Extraction contract**: fake LCEL runnable returns structured Korean examples; malformed/refused/provider failure maps to a diagnostic; no live API in CI.
 - **Service integration**: draft -> confirmation -> request -> result; edits invalidate confirmation; validator catches a deliberately malformed result.
@@ -385,13 +387,14 @@ Expected properties, deliberately not exact block timestamps:
 1. Two deadline tasks are extracted: portfolio due Friday 2026-03-13 22:00 KST and coding-test preparation due Tuesday 2026-03-10 18:00 KST.
 2. The M/W/F interview routine creates six expected occurrences over the two weeks, each one hour within 19:00-21:00 on its occurrence date.
 3. Availability contains weekday evenings and Saturday mornings. No generated block is outside those windows.
-4. The Wednesday 2026-03-04 19:00-20:00 fixed event is preserved and no generated block overlaps it; that day's routine may use another legal hour in its window or is reported unscheduled with a specific reason.
+4. The Wednesday 2026-03-04 19:00-20:00 fixed event is preserved and no generated block overlaps it; routine-first allocation places that day's occurrence in the other legal hour in its 19:00-21:00 window.
 5. All coding-test blocks end by its Tuesday deadline and all portfolio blocks end by its Friday deadline. Portfolio blocks obey its two-hour per-work daily cap. Splits align to 30 minutes.
-6. Deadline work is placed before routine occurrences under the normative policy. With the stated capacity the fixture is expected to be fully schedulable, but tests assert invariants and requested minutes rather than fragile exact starts.
+6. All six constrained routine occurrences are materialized and allocated first; deadline-task work is then ordered by the normative deadline-task rules. Reserving those six hard-window hours before using remaining capacity makes the unchanged canonical inputs fully schedulable. Tests assert this full schedulability, invariants, and requested minutes rather than fragile exact starts.
 7. Adding enough fixed conflicts to remove pre-deadline capacity produces `NO_CAPACITY_BEFORE_DEADLINE`; blocking a routine's complete hard window produces `NO_MATCHING_ROUTINE_WINDOW`. Neither case creates overlaps or silently drops work.
 
 ## 13. Delivery risks and deferred options
 
+- **Blocked-backend migration requirement:** replace any private `ValidationReport._context` or process-local context cache with the required public `context: ParseContext`; make `validate_draft` copy it, make `to_schedule_request` read `planning_start` only from it, and update JSON round-trip tests. Apply the 48-character constraint to `DeadlineTask.id` and `RecurringRoutine.id`, retain 64 characters for other IDs, reject overlength values deterministically, remove block-ID truncation/hash fallbacks, and test exact sequence formatting and the global ceiling. Materialize and allocate sorted constrained routine occurrences before the unchanged deterministic deadline-task phase, while preserving all ordering, caps, unscheduled reporting, post-validation, and statistics-reconciliation invariants.
 - Korean date ambiguity and provider variance are contained by visible context, structured output, field provenance, explicit confirmation, and fake-based tests.
 - The greedy scheduler is deterministic and explainable but not globally optimal. OR-Tools CP-SAT is the documented fallback behind the same API if later requirements demand maximizing scheduled minutes or rearrangement.
 - Dependency APIs, especially Gradio and LangChain, may shift within allowed majors; implementation should pin a resolved environment after the first verified install without widening the contract casually.
