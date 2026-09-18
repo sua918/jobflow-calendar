@@ -13,6 +13,11 @@ import gradio as gr
 from pydantic import ValidationError
 
 from jobflow.models import (
+    AVAILABILITY_MAX_ITEMS,
+    DEADLINE_TASKS_MAX_ITEMS,
+    FIXED_EVENTS_MAX_ITEMS,
+    RAW_INPUT_MAX_CHARS,
+    RECURRING_ROUTINES_MAX_ITEMS,
     AvailabilityRule,
     CalendarEventView,
     CalendarMonthView,
@@ -693,6 +698,22 @@ def apply_table_edits(
     previous_report: ValidationReport | None = None
     try:
         previous_report = ValidationReport.model_validate_json(report_json)
+        table_limits = (
+            ("마감 작업", task_rows, DEADLINE_TASKS_MAX_ITEMS),
+            ("반복 일정", routine_rows, RECURRING_ROUTINES_MAX_ITEMS),
+            ("가능 시간", availability_rows, AVAILABILITY_MAX_ITEMS),
+            ("고정 일정", fixed_event_rows, FIXED_EVENTS_MAX_ITEMS),
+        )
+        for label, rows, maximum in table_limits:
+            if len(rows) > maximum:
+                return _invalid_edit_view(
+                    previous_report,
+                    task_rows,
+                    routine_rows,
+                    availability_rows,
+                    fixed_event_rows,
+                    f"{label}은 최대 {maximum}개까지 입력할 수 있어요.",
+                )
         previous = previous_report.normalized or ExtractionDraft()
         tasks = {item.id: item for item in previous.deadline_tasks}
         routines = {item.id: item for item in previous.recurring_routines}
@@ -1017,6 +1038,7 @@ def build_blocks() -> gr.Blocks:
             text_input = gr.Textbox(
                 label="한국어 일정 요청",
                 lines=8,
+                max_length=RAW_INPUT_MAX_CHARS,
                 placeholder="마감 작업, 반복 일정, 가능한 시간, 고정 일정을 입력하세요.",
             )
             with gr.Column():

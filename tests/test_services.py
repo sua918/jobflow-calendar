@@ -6,6 +6,7 @@ import pytest
 
 from jobflow import services
 from jobflow.models import (
+    RAW_INPUT_MAX_CHARS,
     AvailabilityRule,
     Diagnostic,
     ExtractionDraft,
@@ -71,6 +72,26 @@ def test_parse_failure_returns_only_safe_korean_diagnostic(
     assert report.context == CONTEXT
     assert [item.code for item in report.diagnostics] == ["EXTRACTION_FAILED"]
     assert "민감한 원문" not in report.model_dump_json()
+
+
+def test_oversized_parse_is_rejected_before_provider_with_safe_limit_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    builds = 0
+
+    def build() -> object:
+        nonlocal builds
+        builds += 1
+        raise AssertionError("provider must not be built")
+
+    monkeypatch.setattr("jobflow.extraction._build_runnable", build)
+    report = asyncio.run(services.parse_for_review("민" * (RAW_INPUT_MAX_CHARS + 1), CONTEXT))
+
+    assert builds == 0
+    assert not report.ready_to_schedule
+    assert report.normalized is None
+    assert "10,000자" in report.diagnostics[0].message_ko
+    assert "민민민" not in report.model_dump_json()
 
 
 def test_schedule_confirmed_validates_result_and_explains_in_korean() -> None:

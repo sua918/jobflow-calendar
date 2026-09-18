@@ -6,11 +6,15 @@ from typing import Any, Protocol, cast
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
-from jobflow.models import ExtractionDraft, ParseContext, month_bounds
+from jobflow.models import RAW_INPUT_MAX_CHARS, ExtractionDraft, ParseContext, month_bounds
 
 
 class ExtractionError(RuntimeError):
     """Safe extraction-boundary failure without provider or user payloads."""
+
+
+class InputLimitError(ExtractionError):
+    """Raised before provider construction when raw input exceeds the fixed limit."""
 
 
 class ExtractionRunnable(Protocol):
@@ -79,6 +83,8 @@ async def extract_draft(text: str, context: ParseContext) -> ExtractionDraft:
     """Perform exactly one structured model call and return a typed draft."""
     if not text.strip():
         raise ExtractionError("일정으로 바꿀 내용을 입력해 주세요.")
+    if len(text) > RAW_INPUT_MAX_CHARS:
+        raise InputLimitError("입력은 10,000자 이하로 작성해 주세요.")
     try:
         runnable = _build_runnable()
         horizon_start, horizon_end = month_bounds(context.selected_month)

@@ -3,8 +3,9 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta
 
-from jobflow.extraction import ExtractionError, extract_draft
+from jobflow.extraction import ExtractionError, InputLimitError, extract_draft
 from jobflow.models import (
+    HUMAN_TEXT_MAX_CHARS,
     BlockKind,
     CalendarDayCell,
     CalendarEventView,
@@ -38,10 +39,13 @@ _CATEGORY_LABELS = {
 def _aria_label(
     category: str, title: str, original_start: datetime, original_end: datetime
 ) -> str:
-    return (
-        f"{_CATEGORY_LABELS[category]} {title}, "
-        f"{original_start:%Y-%m-%d %H:%M}부터 {original_end:%Y-%m-%d %H:%M}까지 KST"
+    prefix = f"{_CATEGORY_LABELS[category]} "
+    suffix = (
+        f", {original_start:%Y-%m-%d %H:%M}부터 "
+        f"{original_end:%Y-%m-%d %H:%M}까지 KST"
     )
+    title_length = HUMAN_TEXT_MAX_CHARS - len(prefix) - len(suffix)
+    return f"{prefix}{title[:title_length]}{suffix}"
 
 
 def build_calendar_month_view(
@@ -164,6 +168,19 @@ async def parse_for_review(text: str, context: ParseContext) -> ValidationReport
     """Extract once, then run deterministic draft validation for user review."""
     try:
         draft = await extract_draft(text, context)
+    except InputLimitError:
+        return ValidationReport(
+            normalized=None,
+            diagnostics=[
+                Diagnostic(
+                    code="INPUT_LIMIT_EXCEEDED",
+                    severity=Severity.ERROR,
+                    message_ko="입력은 10,000자 이하로 작성해 주세요.",
+                )
+            ],
+            ready_to_schedule=False,
+            context=context.model_copy(deep=True),
+        )
     except Exception:
         return ValidationReport(
             normalized=None,

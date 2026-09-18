@@ -14,9 +14,40 @@ from pydantic import (
     model_validator,
 )
 
+RAW_INPUT_MAX_CHARS = 10_000
+HUMAN_TEXT_MAX_CHARS = 200
+SOURCE_TEXT_MAX_CHARS = 1_000
+PROVENANCE_ITEMS_MAX = 32
+UNCERTAIN_FIELD_MAX_CHARS = 64
+ASSUMPTION_MAX_CHARS = 200
+PREFERRED_WINDOWS_MAX_ITEMS = 16
+DEADLINE_TASKS_MAX_ITEMS = 50
+RECURRING_ROUTINES_MAX_ITEMS = 50
+AVAILABILITY_MAX_ITEMS = 50
+FIXED_EVENTS_MAX_ITEMS = 100
+
 SafeId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")]
 WorkId = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,47}$")]
-NonBlank = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+NonBlank = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=HUMAN_TEXT_MAX_CHARS,
+    ),
+]
+SourceText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=SOURCE_TEXT_MAX_CHARS),
+]
+UncertainField = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=UNCERTAIN_FIELD_MAX_CHARS),
+]
+Assumption = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=ASSUMPTION_MAX_CHARS),
+]
 KST = ZoneInfo("Asia/Seoul")
 
 
@@ -26,12 +57,16 @@ def _with_default_assumptions(
 ) -> SourceProvenance:
     if not assumptions:
         return provenance
-    return provenance.model_copy(
-        update={
+    combined_assumptions = [*provenance.assumptions]
+    combined_assumptions.extend(
+        assumption for assumption in assumptions if assumption not in combined_assumptions
+    )
+    return SourceProvenance.model_validate(
+        {
+            **provenance.model_dump(),
             "extraction_method": ExtractionMethod.DEFAULT,
-            "assumptions": [*provenance.assumptions, *assumptions],
-        },
-        deep=True,
+            "assumptions": combined_assumptions,
+        }
     )
 
 
@@ -88,11 +123,17 @@ class StrictModel(BaseModel):
 
 
 class SourceProvenance(StrictModel):
-    source_text: NonBlank
+    source_text: SourceText
     extraction_method: ExtractionMethod
     confidence: float = Field(ge=0.0, le=1.0)
-    uncertain_fields: list[str] = Field(default_factory=list)
-    assumptions: list[str] = Field(default_factory=list)
+    uncertain_fields: list[UncertainField] = Field(
+        default_factory=list,
+        max_length=PROVENANCE_ITEMS_MAX,
+    )
+    assumptions: list[Assumption] = Field(
+        default_factory=list,
+        max_length=PROVENANCE_ITEMS_MAX,
+    )
 
 
 class LocalTimeWindow(StrictModel):
@@ -152,7 +193,10 @@ class DeadlineTask(StrictModel):
     min_block_minutes: int = Field(default=30, gt=0)
     max_block_minutes: int = Field(default=120, gt=0)
     daily_cap_minutes: int = Field(default=240, gt=0)
-    preferred_windows: list[LocalTimeWindow] = Field(default_factory=list)
+    preferred_windows: list[LocalTimeWindow] = Field(
+        default_factory=list,
+        max_length=PREFERRED_WINDOWS_MAX_ITEMS,
+    )
     provenance: SourceProvenance
 
     @field_validator("deadline", "earliest_start")
@@ -240,10 +284,22 @@ class ParseContext(StrictModel):
 
 
 class ExtractionDraft(StrictModel):
-    deadline_tasks: list[DeadlineTask] = Field(default_factory=list)
-    recurring_routines: list[RecurringRoutine] = Field(default_factory=list)
-    availability: list[AvailabilityRule] = Field(default_factory=list)
-    fixed_events: list[FixedEvent] = Field(default_factory=list)
+    deadline_tasks: list[DeadlineTask] = Field(
+        default_factory=list,
+        max_length=DEADLINE_TASKS_MAX_ITEMS,
+    )
+    recurring_routines: list[RecurringRoutine] = Field(
+        default_factory=list,
+        max_length=RECURRING_ROUTINES_MAX_ITEMS,
+    )
+    availability: list[AvailabilityRule] = Field(
+        default_factory=list,
+        max_length=AVAILABILITY_MAX_ITEMS,
+    )
+    fixed_events: list[FixedEvent] = Field(
+        default_factory=list,
+        max_length=FIXED_EVENTS_MAX_ITEMS,
+    )
 
 
 DetailValue = str | int | float | bool | None
@@ -270,10 +326,22 @@ class ScheduleRequest(StrictModel):
     timezone: Literal["Asia/Seoul"] = "Asia/Seoul"
     slot_minutes: Literal[30] = 30
     daily_work_cap_minutes: int = Field(default=240, gt=0, multiple_of=30)
-    deadline_tasks: list[DeadlineTask] = Field(default_factory=list)
-    recurring_routines: list[RecurringRoutine] = Field(default_factory=list)
-    availability: list[AvailabilityRule] = Field(min_length=1)
-    fixed_events: list[FixedEvent] = Field(default_factory=list)
+    deadline_tasks: list[DeadlineTask] = Field(
+        default_factory=list,
+        max_length=DEADLINE_TASKS_MAX_ITEMS,
+    )
+    recurring_routines: list[RecurringRoutine] = Field(
+        default_factory=list,
+        max_length=RECURRING_ROUTINES_MAX_ITEMS,
+    )
+    availability: list[AvailabilityRule] = Field(
+        min_length=1,
+        max_length=AVAILABILITY_MAX_ITEMS,
+    )
+    fixed_events: list[FixedEvent] = Field(
+        default_factory=list,
+        max_length=FIXED_EVENTS_MAX_ITEMS,
+    )
 
 
 class ScheduleBlock(StrictModel):

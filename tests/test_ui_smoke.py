@@ -6,7 +6,7 @@ import os
 import gradio as gr
 
 from jobflow.app import build_app, main
-from jobflow.models import ExtractionMethod, UnscheduledReason
+from jobflow.models import RAW_INPUT_MAX_CHARS, ExtractionMethod, UnscheduledReason
 from jobflow.services import build_calendar_month_view
 from jobflow.ui import (
     _parse_selected_month,
@@ -28,6 +28,17 @@ def test_build_app_constructs_without_openai_key(monkeypatch) -> None:
 
     assert isinstance(app, gr.Blocks)
     assert app.analytics_enabled is False
+
+
+def test_raw_input_config_exposes_authoritative_max_length() -> None:
+    app = build_app()
+    raw_input = next(
+        component
+        for component in app.config["components"]
+        if component["props"].get("label") == "한국어 일정 요청"
+    )
+
+    assert raw_input["props"]["max_length"] == RAW_INPUT_MAX_CHARS
 
 
 def test_main_disables_run_history_and_uses_loopback(monkeypatch) -> None:
@@ -145,6 +156,27 @@ def test_calendar_title_is_escaped_at_html_boundary() -> None:
 
     assert "<img" not in result.calendar_html
     assert "&lt;img" in result.calendar_html
+
+
+def test_max_length_titles_schedule_and_render_without_truncating_visible_title() -> None:
+    review = load_canonical_demo()
+    task_rows = [row.copy() for row in review.task_rows]
+    fixed_rows = [row.copy() for row in review.fixed_event_rows]
+    task_rows[0][1] = "가" * 200
+    fixed_rows[0][1] = "나" * 200
+    edited = apply_table_edits(
+        review.report_json,
+        task_rows,
+        review.routine_rows,
+        review.availability_rows,
+        fixed_rows,
+    )
+
+    result = schedule_review(edited.report_json, confirmed=True)
+
+    assert result.result is not None
+    assert "가" * 200 in result.calendar_html
+    assert "나" * 200 in result.calendar_html
 
 
 def test_calendar_overflow_control_exposes_ordered_extra_events() -> None:
@@ -329,6 +361,39 @@ def test_invalid_table_value_stays_visible_and_cannot_schedule() -> None:
     assert edited.report is not None and edited.report.normalized is not None
     assert result.result is None
     assert "CONFIRMATION_REQUIRED" in result.diagnostics
+
+
+def test_editable_table_count_limits_accept_max_and_reject_max_plus_one() -> None:
+    review = load_canonical_demo()
+    cases = (
+        ("task_rows", 50, "task-limit"),
+        ("routine_rows", 50, "routine-limit"),
+        ("availability_rows", 50, "availability-limit"),
+        ("fixed_event_rows", 100, "fixed-limit"),
+    )
+    for attribute, maximum, prefix in cases:
+        source = getattr(review, attribute)[0]
+        rows = []
+        for index in range(maximum):
+            row = source.copy()
+            row[0] = f"{prefix}-{index + 1:03d}"
+            rows.append(row)
+        table_values = {
+            "task_rows": review.task_rows,
+            "routine_rows": review.routine_rows,
+            "availability_rows": review.availability_rows,
+            "fixed_event_rows": review.fixed_event_rows,
+            attribute: rows,
+        }
+
+        accepted = apply_table_edits(review.report_json, **table_values)
+        assert f"최대 {maximum}개" not in accepted.diagnostics
+
+        table_values[attribute] = [*rows, rows[0].copy()]
+        rejected = apply_table_edits(review.report_json, **table_values)
+        assert not rejected.ready
+        assert f"최대 {maximum}개" in rejected.diagnostics
+        assert len(getattr(rejected, attribute)) == maximum + 1
 
 
 def test_infeasible_demo_shows_exact_routine_reason_and_remaining_minutes() -> None:

@@ -6,6 +6,7 @@ import pytest
 
 from jobflow import extraction
 from jobflow.models import (
+    RAW_INPUT_MAX_CHARS,
     AvailabilityRule,
     DeadlineTask,
     ExtractionDraft,
@@ -160,3 +161,29 @@ def test_blank_text_and_missing_key_fail_without_network(
         asyncio.run(extraction.extract_draft("  ", CONTEXT))
     with pytest.raises(extraction.ExtractionError):
         asyncio.run(extraction.extract_draft("일정을 만들어 줘", CONTEXT))
+
+
+def test_raw_input_max_is_accepted_and_max_plus_one_never_builds_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    accepted = FakeRunnable(valid_draft())
+    builds = 0
+
+    def build() -> FakeRunnable:
+        nonlocal builds
+        builds += 1
+        return accepted
+
+    monkeypatch.setattr(extraction, "_build_runnable", build)
+    result = asyncio.run(extraction.extract_draft("가" * RAW_INPUT_MAX_CHARS, CONTEXT))
+    assert result == valid_draft()
+    assert builds == 1
+    assert len(accepted.calls) == 1
+
+    for rejected in ("가" * (RAW_INPUT_MAX_CHARS + 1), "가" * 1_000_000):
+        with pytest.raises(extraction.ExtractionError) as caught:
+            asyncio.run(extraction.extract_draft(rejected, CONTEXT))
+        assert "10,000자" in str(caught.value)
+        assert rejected not in str(caught.value)
+    assert builds == 1
+    assert len(accepted.calls) == 1
