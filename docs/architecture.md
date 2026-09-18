@@ -1,6 +1,6 @@
 # JobFlow MVP architecture and shared contracts
 
-Status: architecture gate for `feature/jobflow-mvp`  
+Status: architecture gate for `feature/jobflow-mvp`
 Scope: a 1.5-day course MVP; this document is normative for backend and frontend work.
 
 ## 1. Product boundary and architectural decision
