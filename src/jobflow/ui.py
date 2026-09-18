@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from html import escape
 from pathlib import Path
 from typing import TypeAlias, cast
 from zoneinfo import ZoneInfo
@@ -12,6 +14,8 @@ from pydantic import ValidationError
 
 from jobflow.models import (
     AvailabilityRule,
+    CalendarEventView,
+    CalendarMonthView,
     DeadlineTask,
     Diagnostic,
     ExtractionDraft,
@@ -21,6 +25,7 @@ from jobflow.models import (
     ParseContext,
     RecurringRoutine,
     ScheduleResult,
+    ScheduleStats,
     SelectedMonth,
     Severity,
     SourceProvenance,
@@ -30,6 +35,7 @@ from jobflow.models import (
 )
 from jobflow.services import (
     InternalScheduleError,
+    build_calendar_month_view,
     explain_result_ko,
     parse_for_review,
     schedule_confirmed,
@@ -93,6 +99,98 @@ UNSCHEDULED_HEADERS = [
     "상세",
 ]
 
+WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"]
+WEEKDAY_ARIA_LABELS = [
+    "월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"
+]
+CATEGORY_ICONS = {
+    "deadline_task": "◆",
+    "recurring_routine": "↻",
+    "fixed_event": "■",
+}
+
+APP_CSS = """
+:root {
+  --jf-ink: #0F172A; --jf-muted: #475569; --jf-border: #CBD5E1;
+  --jf-surface: #FFFFFF; --jf-surface-soft: #F8FAFC; --jf-primary: #4F46E5;
+  --jf-focus: #4F46E5; --jf-deadline: #0072B2; --jf-deadline-bg: #E6F4FB;
+  --jf-routine: #009E73; --jf-routine-bg: #E7F6F1;
+  --jf-fixed: #9A6700; --jf-fixed-bg: #FFF4D6;
+  --jf-warning: #D55E00; --jf-warning-bg: #FDECE7;
+  --jf-radius: 10px;
+}
+.gradio-container { color: var(--jf-ink) !important;
+  background: var(--jf-surface-soft) !important; }
+.jf-hero { padding: 1.25rem 1.5rem; border: 1px solid var(--jf-border); border-radius: 16px;
+  background: var(--jf-surface); box-shadow: 0 8px 24px rgba(15, 23, 42, .06); }
+.jf-hero h1 { margin: 0 0 .35rem; color: var(--jf-ink); letter-spacing: -.02em; }
+button.primary { background: var(--jf-primary) !important; color: #FFF !important; }
+button, input, textarea, [role="tab"], summary { min-height: 44px; }
+button:disabled { opacity: .55; cursor: not-allowed; }
+[role="tab"][aria-selected="true"] { color: var(--jf-primary) !important;
+  border-bottom: 3px solid var(--jf-primary) !important; font-weight: 800; }
+.warning-panel { border-left: 4px solid var(--jf-warning) !important;
+  background: var(--jf-warning-bg) !important; }
+:where(button, input, textarea, [role="tab"], summary, .calendar-event):focus-visible {
+  outline: 3px solid var(--jf-focus) !important; outline-offset: 2px;
+}
+.calendar-shell { color: var(--jf-ink); background: var(--jf-surface);
+  border: 1px solid var(--jf-border);
+  border-radius: 14px; overflow: hidden; }
+.calendar-title { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+  padding: 1rem 1.25rem; border-bottom: 1px solid var(--jf-border); }
+.calendar-title h3, .calendar-title p { margin: 0; }
+.calendar-title p { color: var(--jf-muted); }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.calendar-weekday { padding: .65rem; text-align: center; font-weight: 700; color: var(--jf-muted);
+  background: var(--jf-surface-soft); border-bottom: 1px solid var(--jf-border); }
+.calendar-day { min-width: 0; min-height: 136px; padding: .5rem;
+  border-right: 1px solid var(--jf-border);
+  border-bottom: 1px solid var(--jf-border); background: var(--jf-surface); }
+.calendar-day:nth-child(7n) { border-right: 0; }
+.calendar-day:hover { background: #F1F5F9; }
+.calendar-day.outside-month { color: #64748B; background: #F8FAFC; }
+.calendar-day.today { box-shadow: inset 0 0 0 3px var(--jf-primary); }
+.day-number { display: inline-flex; align-items: center; justify-content: center; min-width: 28px;
+  min-height: 28px; font-weight: 700; }
+.today .day-number { border-radius: 999px; background: var(--jf-primary); color: #FFF; }
+.day-events { display: grid; gap: .35rem; margin-top: .35rem; }
+.calendar-event { display: grid; min-width: 0; padding: .38rem .45rem; border: 1px solid;
+  border-left-width: 4px; border-radius: 7px; line-height: 1.25; cursor: default; }
+.calendar-event.deadline_task { border-color: var(--jf-deadline);
+  background: var(--jf-deadline-bg); }
+.calendar-event.recurring_routine { border-color: var(--jf-routine);
+  background: var(--jf-routine-bg); }
+.calendar-event.fixed_event { border-color: var(--jf-fixed); background: var(--jf-fixed-bg); }
+.category-label { font-size: .72rem; font-weight: 800; }
+.event-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.calendar-event time { color: var(--jf-muted); font-size: .76rem; }
+.calendar-overflow summary { display: flex; align-items: center;
+  color: var(--jf-primary); font-weight: 700;
+  cursor: pointer; }
+.empty-day { color: var(--jf-muted); font-size: .78rem; }
+.calendar-empty, .calendar-loading { display: grid; place-items: center;
+  min-height: 220px; padding: 2rem; color: var(--jf-muted);
+  background: var(--jf-surface); border: 1px dashed var(--jf-border);
+  border-radius: 14px; }
+.calendar-loading { background: linear-gradient(90deg, #F8FAFC, #EEF2FF, #F8FAFC); }
+@media (max-width: 700px) {
+  .calendar-title { align-items: flex-start; flex-direction: column; }
+  .calendar-grid { display: block; }
+  .calendar-weekday, .calendar-day.outside-month, .calendar-day.empty-day-cell {
+    display: none;
+  }
+  .calendar-day { min-height: 88px; border-right: 0; padding: .75rem; }
+  .calendar-day::before { content: attr(data-date); display: block; color: var(--jf-muted);
+    font-size: .78rem; font-weight: 700; }
+  .day-number { display: none; }
+  .event-title { white-space: normal; overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}
+"""
+
 
 @dataclass(frozen=True)
 class ReviewView:
@@ -118,6 +216,102 @@ class ScheduleView:
     summary: str
     stats: str
     diagnostics: str
+    calendar_html: str
+
+
+def _parse_selected_month(value: str) -> SelectedMonth:
+    """Parse the UI's exact YYYY-MM adapter into the shared domain type."""
+    if re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", value.strip()) is None:
+        raise ValueError("selected month must use YYYY-MM")
+    year, month = (int(part) for part in value.strip().split("-"))
+    return SelectedMonth(year=year, month=month)
+
+
+def _event_chip(event: CalendarEventView) -> str:
+    continuation = ""
+    if event.starts_before_segment:
+        continuation += '<span class="continuation" aria-label="이전 날부터 계속">←</span>'
+    if event.ends_after_segment:
+        continuation += '<span class="continuation" aria-label="다음 날까지 계속">→</span>'
+    start = event.segment_start.strftime("%H:%M")
+    end = event.segment_end.strftime("%H:%M")
+    return (
+        f'<article class="calendar-event {escape(event.category)}" tabindex="0" '
+        f'data-view-id="{escape(event.view_id)}" data-source-id="{escape(event.source_id)}" '
+        f'aria-label="{escape(event.aria_label_ko)}">'
+        f'<span class="category-label"><span aria-hidden="true">'
+        f'{CATEGORY_ICONS[event.category]}</span> {escape(event.category_label_ko)}</span>'
+        f'<span class="event-title">{escape(event.title)}</span>'
+        f'<time>{start}–{end}</time>{continuation}</article>'
+    )
+
+
+def _render_calendar_view(view: CalendarMonthView) -> str:
+    month_label = f"{view.selected_month.year}년 {view.selected_month.month}월"
+    header = "".join(
+        f'<div class="calendar-weekday" role="columnheader" aria-label="{aria}">{label}</div>'
+        for label, aria in zip(WEEKDAY_LABELS, WEEKDAY_ARIA_LABELS, strict=True)
+    )
+    cells: list[str] = []
+    for cell in view.days:
+        classes = ["calendar-day"]
+        if not cell.in_selected_month:
+            classes.append("outside-month")
+        if cell.is_today:
+            classes.append("today")
+        if cell.in_selected_month and not cell.events:
+            classes.append("empty-day-cell")
+        visible = cell.events[:3]
+        overflow = cell.events[3:]
+        events = "".join(_event_chip(event) for event in visible)
+        if overflow:
+            hidden_events = "".join(_event_chip(event) for event in overflow)
+            events += (
+                '<details class="calendar-overflow">'
+                f'<summary aria-label="{cell.date.isoformat()} 일정 {len(overflow)}개 더 보기">'
+                f'+{len(overflow)}개 더 보기</summary>{hidden_events}</details>'
+            )
+        if cell.in_selected_month and not cell.events:
+            events = '<span class="empty-day">일정 없음</span>'
+        aria = f"{cell.date.isoformat()}, 일정 {len(cell.events)}개"
+        cells.append(
+            f'<div class="{" ".join(classes)}" role="gridcell" aria-label="{aria}" '
+            f'data-date="{cell.date.isoformat()}">'
+            f'<time class="day-number" datetime="{cell.date.isoformat()}">{cell.date.day}</time>'
+            f'<div class="day-events">{events}</div></div>'
+        )
+    return (
+        '<section class="calendar-shell" aria-labelledby="calendar-heading">'
+        f'<div class="calendar-title"><h3 id="calendar-heading">{month_label}</h3>'
+        '<p>월요일 시작 · 한국 표준시</p></div>'
+        f'<div class="calendar-grid" role="grid" aria-label="{month_label} 월간 달력" '
+        f'aria-rowcount="{view.row_count + 1}" aria-colcount="7">'
+        f'{header}{"".join(cells)}</div></section>'
+    )
+
+
+def render_calendar_month(
+    report: ValidationReport, result: ScheduleResult | None
+) -> str:
+    """Render the approved backend calendar projection with escaped DOM content."""
+    request = to_schedule_request(report)
+    safe_result = result or ScheduleResult(
+        blocks=[],
+        unscheduled=[],
+        diagnostics=[],
+        stats=ScheduleStats(requested_minutes=0, scheduled_minutes=0, unscheduled_minutes=0),
+        is_fully_scheduled=True,
+    )
+    return _render_calendar_view(
+        build_calendar_month_view(request, safe_result, today=datetime.now(KST).date())
+    )
+
+
+def _empty_calendar(message: str = "일정을 만들면 월간 달력이 여기에 표시돼요.") -> str:
+    return (
+        '<section class="calendar-empty" role="status">'
+        f'<span aria-hidden="true">□</span><p>{escape(message)}</p></section>'
+    )
 
 
 def _format_datetime(value: datetime | None) -> str:
@@ -352,15 +546,14 @@ def _invalid_edit_view(
     )
 
 
-async def parse_input(text: str, reference_datetime: str, planning_start: str) -> ReviewView:
+async def parse_input(text: str, reference_datetime: str, selected_month: str) -> ReviewView:
     try:
-        selected_date = _parse_date(planning_start)
         context = ParseContext(
             reference_datetime=_parse_datetime(reference_datetime),
-            selected_month=SelectedMonth(year=selected_date.year, month=selected_date.month),
+            selected_month=_parse_selected_month(selected_month),
         )
     except (ValueError, ValidationError):
-        return _safe_error_view("기준 시각과 계획 시작일 형식을 확인해 주세요.")
+        return _safe_error_view("기준 시각과 계획 월(YYYY-MM) 형식을 확인해 주세요.")
     try:
         return _view_from_report(await parse_for_review(text, context))
     except Exception:
@@ -548,6 +741,7 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
             summary="검토 완료를 체크해야 일정을 만들 수 있어요.",
             stats="요청 0분 · 배치 0분 · 미배치 0분",
             diagnostics="[ERROR] CONFIRMATION_REQUIRED · 검토 완료를 확인해 주세요.",
+            calendar_html=_empty_calendar("검토 완료 후 일정을 만들어 주세요."),
         )
     try:
         report = ValidationReport.model_validate_json(report_json)
@@ -561,6 +755,7 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
             summary="검증을 통과한 입력만 일정을 만들 수 있어요.",
             stats="요청 0분 · 배치 0분 · 미배치 0분",
             diagnostics="[ERROR] CONFIRMATION_REQUIRED · 입력 진단을 확인해 주세요.",
+            calendar_html=_empty_calendar("입력 진단을 먼저 확인해 주세요."),
         )
     except InternalScheduleError:
         return ScheduleView(
@@ -571,6 +766,7 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
             summary="일정을 안전하게 만들지 못했어요.",
             stats="요청 0분 · 배치 0분 · 미배치 0분",
             diagnostics="[ERROR] INTERNAL_SCHEDULE_INVALID · 잠시 후 다시 시도해 주세요.",
+            calendar_html=_empty_calendar("일정을 안전하게 만들지 못했어요."),
         )
     except Exception:
         return ScheduleView(
@@ -581,6 +777,7 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
             summary="일정을 처리하지 못했어요.",
             stats="요청 0분 · 배치 0분 · 미배치 0분",
             diagnostics="[ERROR] INTERNAL_SCHEDULE_INVALID · 잠시 후 다시 시도해 주세요.",
+            calendar_html=_empty_calendar("일정을 처리하지 못했어요."),
         )
     timeline: Rows = [
         [
@@ -620,6 +817,7 @@ def schedule_review(report_json: str, confirmed: bool) -> ScheduleView:
             f"미배치 {result.stats.unscheduled_minutes}분"
         ),
         diagnostics=_diagnostics_text(result.diagnostics),
+        calendar_html=render_calendar_month(report, result),
     )
 
 
@@ -640,6 +838,7 @@ def _review_outputs(view: ReviewView) -> tuple[object, ...]:
         "아직 일정이 없어요.",
         "요청 0분 · 배치 0분 · 미배치 0분",
         "진단 없음",
+        _empty_calendar(),
     )
 
 
@@ -660,6 +859,7 @@ def _edit_outputs(view: ReviewView) -> tuple[object, ...]:
         "입력이 바뀌어 이전 일정을 지웠어요.",
         "요청 0분 · 배치 0분 · 미배치 0분",
         "진단 없음",
+        _empty_calendar("입력이 바뀌어 이전 일정을 지웠어요."),
     )
 
 
@@ -679,6 +879,7 @@ def _schedule_outputs(view: ScheduleView) -> tuple[object, ...]:
         view.summary,
         view.stats,
         view.diagnostics,
+        view.calendar_html,
     )
 
 
@@ -697,19 +898,20 @@ def _begin_parse() -> tuple[object, ...]:
         "입력을 분석하고 있어요.",
         "요청 0분 · 배치 0분 · 미배치 0분",
         "진단 없음",
+        '<section class="calendar-loading" role="status" aria-live="polite">'
+        "입력을 분석하고 있어요.</section>",
     )
 
 
-def invalidate_input(reference_datetime: str, planning_start: str) -> ReviewView:
+def invalidate_input(reference_datetime: str, selected_month: str) -> ReviewView:
     try:
-        selected_date = _parse_date(planning_start)
         context = ParseContext(
             reference_datetime=_parse_datetime(reference_datetime),
-            selected_month=SelectedMonth(year=selected_date.year, month=selected_date.month),
+            selected_month=_parse_selected_month(selected_month),
         )
         context_text = _context_text(context)
     except (ValueError, ValidationError):
-        context_text = "기준 시각과 계획 시작일 형식을 확인해 주세요."
+        context_text = "기준 시각과 계획 월(YYYY-MM) 형식을 확인해 주세요."
     return ReviewView(
         report_json="",
         report=None,
@@ -723,8 +925,8 @@ def invalidate_input(reference_datetime: str, planning_start: str) -> ReviewView
     )
 
 
-def _clear_for_input(reference_datetime: str, planning_start: str) -> tuple[object, ...]:
-    view = invalidate_input(reference_datetime, planning_start)
+def _clear_for_input(reference_datetime: str, selected_month: str) -> tuple[object, ...]:
+    view = invalidate_input(reference_datetime, selected_month)
     return (
         view.report_json,
         view.task_rows,
@@ -741,13 +943,14 @@ def _clear_for_input(reference_datetime: str, planning_start: str) -> tuple[obje
         "아직 일정이 없어요.",
         "요청 0분 · 배치 0분 · 미배치 0분",
         "진단 없음",
+        _empty_calendar(),
     )
 
 
 async def _parse_callback(
-    text: str, reference_datetime: str, planning_start: str
+    text: str, reference_datetime: str, selected_month: str
 ) -> tuple[object, ...]:
-    return _review_outputs(await parse_input(text, reference_datetime, planning_start))
+    return _review_outputs(await parse_input(text, reference_datetime, selected_month))
 
 
 def _demo_callback() -> tuple[object, ...]:
@@ -755,7 +958,21 @@ def _demo_callback() -> tuple[object, ...]:
 
 
 def _demo_and_enable_parse() -> tuple[object, ...]:
-    return (*_demo_callback(), gr.Button(interactive=True))
+    view = load_canonical_demo()
+    if view.report is None:
+        now = datetime.now(KST).replace(second=0, microsecond=0)
+        reference = _format_datetime(now)
+        selected_month = f"{now.year:04d}-{now.month:02d}"
+    else:
+        context = view.report.context
+        reference = _format_datetime(context.reference_datetime)
+        selected_month = f"{context.selected_month.year:04d}-{context.selected_month.month:02d}"
+    return (
+        *_review_outputs(view),
+        gr.Button(interactive=True),
+        reference,
+        selected_month,
+    )
 
 
 def _edit_and_enable_parse(
@@ -772,23 +989,29 @@ def _edit_and_enable_parse(
 
 
 def _clear_and_enable_parse(
-    reference_datetime: str, planning_start: str
+    reference_datetime: str, selected_month: str
 ) -> tuple[object, ...]:
     return (
-        *_clear_for_input(reference_datetime, planning_start),
+        *_clear_for_input(reference_datetime, selected_month),
         gr.Button(interactive=True),
     )
 
 
 def build_blocks() -> gr.Blocks:
     now = datetime.now(KST).replace(second=0, microsecond=0)
-    with gr.Blocks(title="JobFlow — 규칙 기반 일정", analytics_enabled=False) as app:
+    with gr.Blocks(
+        title="JobFlow — 월간 규칙 기반 일정",
+        analytics_enabled=False,
+        fill_width=True,
+    ) as app:
         report_state = gr.State("")
         result_state = gr.State("")
         gr.Markdown(
             "# JobFlow\n"
-            "한국어 작업을 검토한 뒤 결정적 2주 계획으로 배치하는 **규칙 기반 일정** 도구예요. "
-            "전체 배치량을 최대화하지 않으며 새로고침하거나 프로세스를 종료하면 데이터가 사라져요."
+            "한국어 작업을 검토한 뒤 선택한 달에 배치하는 **규칙 기반 일정** 도구예요.  "
+            "월간 달력을 먼저 보고 상세 일정과 미배치 사유도 확인할 수 있어요. "
+            "새로고침하거나 프로세스를 종료하면 데이터가 사라져요.",
+            elem_classes=["jf-hero"],
         )
         with gr.Row():
             text_input = gr.Textbox(
@@ -802,7 +1025,10 @@ def build_blocks() -> gr.Blocks:
                     value=_format_datetime(now),
                 )
                 planning_input = gr.Textbox(
-                    label="계획 시작일 (KST, YYYY-MM-DD)", value=now.date().isoformat()
+                    label="계획 월 (KST, YYYY-MM)",
+                    value=f"{now.year:04d}-{now.month:02d}",
+                    placeholder="2026-03",
+                    max_lines=1,
                 )
                 context_box = gr.Markdown(
                     _context_text(
@@ -871,26 +1097,37 @@ def build_blocks() -> gr.Blocks:
         stats_box = gr.Textbox(
             label="통계", value="요청 0분 · 배치 0분 · 미배치 0분"
         )
-        timeline_table = gr.Dataframe(
-            headers=TIMELINE_HEADERS,
-            datatype=["str", "str", "str", "str", "str", "number"],
-            value=[],
-            label="2주 날짜별 일정",
-            interactive=False,
-            type="array",
-        )
-        unscheduled_table = gr.Dataframe(
-            headers=UNSCHEDULED_HEADERS,
-            datatype=[
-                "str", "str", "str", "str", "number", "number", "number", "str", "str",
-                "str",
-            ],
-            value=[],
-            label="미배치 작업 (항상 표시)",
-            interactive=False,
-            type="array",
-        )
-        schedule_diagnostics = gr.Textbox(label="일정 진단", value="진단 없음", lines=4)
+        with gr.Tabs():
+            with gr.Tab("월간 달력", id="month"):
+                calendar_html = gr.HTML(_empty_calendar(), label="월간 달력")
+            with gr.Tab("상세 일정", id="details"):
+                timeline_table = gr.Dataframe(
+                    headers=TIMELINE_HEADERS,
+                    datatype=["str", "str", "str", "str", "str", "number"],
+                    value=[],
+                    label="상세 일정",
+                    interactive=False,
+                    type="array",
+                )
+            with gr.Tab("미배치 및 진단", id="diagnostics"):
+                unscheduled_table = gr.Dataframe(
+                    headers=UNSCHEDULED_HEADERS,
+                    datatype=[
+                        "str", "str", "str", "str", "number", "number", "number",
+                        "str", "str", "str",
+                    ],
+                    value=[],
+                    label="미배치 작업 (항상 표시)",
+                    interactive=False,
+                    type="array",
+                    elem_classes=["warning-panel"],
+                )
+                schedule_diagnostics = gr.Textbox(
+                    label="일정 진단",
+                    value="진단 없음",
+                    lines=4,
+                    elem_classes=["warning-panel"],
+                )
 
         review_outputs = [
             report_state,
@@ -908,6 +1145,7 @@ def build_blocks() -> gr.Blocks:
             summary_box,
             stats_box,
             schedule_diagnostics,
+            calendar_html,
         ]
         schedule_outputs = [
             result_state,
@@ -916,6 +1154,7 @@ def build_blocks() -> gr.Blocks:
             summary_box,
             stats_box,
             schedule_diagnostics,
+            calendar_html,
         ]
         confirmation_event = confirmed_box.change(
             _confirmation_button,
@@ -953,7 +1192,7 @@ def build_blocks() -> gr.Blocks:
         review_and_parse_outputs = [*review_outputs, parse_button]
         demo_button.click(
             _demo_and_enable_parse,
-            outputs=review_and_parse_outputs,
+            outputs=[*review_and_parse_outputs, reference_input, planning_input],
             cancels=[parse_response, schedule_response],
         )
 

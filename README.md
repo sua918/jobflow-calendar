@@ -1,16 +1,14 @@
 # JobFlow
 
-> **Migration status:** this README documents the reviewed rolling-plan implementation at baseline `767fc1ac4a4ae38351cfb925ec29eb91ef2162ef`. All `2주`/`14일` statements below are historical baseline behavior, not the normative target. The approved selected-calendar-month contract and downstream migration requirements are in `docs/architecture.md`; frontend implementation will update this README after the backend month schema is approved.
-
-JobFlow는 한국어로 입력한 취업 준비 작업을 편집 가능한 구조로 검토한 뒤, 2주 동안의 충돌 없는 `규칙 기반 일정`으로 배치하는 로컬 Gradio MVP입니다.
+JobFlow는 한국어로 입력한 취업 준비 작업을 편집 가능한 구조로 검토한 뒤, 사용자가 고른 달의 충돌 없는 `규칙 기반 일정`으로 배치하는 로컬 Gradio MVP입니다.
 
 ## 무엇을 하나요
 
-1. 한국어 원문과 기준 시각, 계획 시작일을 입력합니다.
+1. 한국어 원문과 기준 시각, 계획 월(`YYYY-MM`)을 입력합니다. 계획 월의 기본값은 현재 `Asia/Seoul` 월입니다.
 2. `Parse — AI로 구조화`를 눌러 마감 작업, 반복 일정, 가능 시간, 고정 일정을 추출합니다.
 3. 네 개의 표와 필드·항목 진단을 검토하고 필요한 값을 수정합니다.
 4. 모든 결정적 검증을 통과한 뒤 `검토 완료`를 체크합니다.
-5. `규칙 기반 일정 만들기`를 눌러 2주 일정, 미배치 사유, 분 단위 통계를 확인합니다.
+5. `규칙 기반 일정 만들기`를 눌러 기본 월간 달력, 상세 일정, 미배치 사유와 분 단위 통계를 확인합니다.
 
 일정 생성은 30분 격자, `Asia/Seoul`, 가능 시간, 고정 일정, 마감, 반복 허용 시간, 작업별·전체 일일 제한을 결정적으로 적용합니다. 반복 일정의 제한된 발생분을 먼저 배치하고, 마감 작업은 이른 마감순으로 배치합니다.
 
@@ -26,7 +24,7 @@ JobFlow는 한국어로 입력한 취업 준비 작업을 편집 가능한 구�
 ## 한계
 
 - 이 MVP의 스케줄러는 설명 가능한 greedy 규칙을 사용합니다. 전체 배치량을 최대화하지 않으며, 다른 재배치가 더 많은 작업을 담을 수도 있습니다. 배치하지 못한 작업은 사유와 남은 시간을 별도 표에 항상 표시합니다.
-- 시간대는 `Asia/Seoul`, 계획 범위는 14일, 시간 격자는 30분으로 고정됩니다.
+- 시간대는 `Asia/Seoul`, 계획 범위는 선택한 달의 첫날 00:00부터 다음 달 첫날 00:00 미만, 시간 격자는 30분으로 고정됩니다.
 - 자정이 넘어가는 가능 시간은 지원하지 않으므로 날짜별 규칙으로 나눠 입력해야 합니다.
 - 계정, 데이터베이스, 지속 저장, 알림, Google Calendar 연동, ICS 내보내기, 드래그앤드롭, 배포 기능은 포함하지 않습니다.
 - LLM은 텍스트 구조화만 담당합니다. 충돌, 용량, 반복, 마감, 시간대의 최종 판단은 Pydantic 검증과 결정적 스케줄러가 담당합니다.
@@ -71,11 +69,12 @@ OPENAI_MODEL=gpt-4.1-mini
 
 1. 앱을 실행합니다.
 2. `키 없이 구조화 데모 불러오기`를 누릅니다.
-3. 기준 컨텍스트가 2026-03-02 KST, 계획 시작일이 2026-03-02인지 확인합니다.
+3. 기준 컨텍스트가 2026-03-02 KST, 선택한 계획 월이 `2026-03`인지 확인합니다.
 4. 두 마감 작업, 월·수·금 면접 연습, 평일 저녁·토요일 오전 가능 시간, 2026-03-04 스터디를 검토합니다.
 5. `검토 완료`를 체크하고 `규칙 기반 일정 만들기`를 누릅니다.
-6. 요청 960분, 배치 960분, 미배치 0분과 면접 연습 6회가 표시되는지 확인합니다.
-7. 표를 수정하면 이전 결과와 검토 완료가 즉시 무효화됩니다. 예를 들어 반복 일정의 한 날짜에 허용 시간 전체를 덮는 고정 일정을 추가하면 미배치 표에 정확한 사유와 남은 시간이 표시됩니다.
+6. 첫 결과 탭의 월요일 시작 6주 달력(2026-02-23~2026-04-05), 요청 960분, 배치 960분, 미배치 0분과 면접 연습 6회를 확인합니다.
+7. `상세 일정`과 `미배치 및 진단` 탭에서 블록 ID, 시간, exact 사유와 남은 시간을 확인합니다.
+8. 계획 월이나 표를 수정하면 이전 결과와 검토 완료가 즉시 무효화됩니다. 예를 들어 반복 일정의 한 날짜에 허용 시간 전체를 덮는 고정 일정을 추가하면 미배치 표에 정확한 사유와 남은 시간이 표시됩니다.
 
 ## 테스트와 품질 검사
 
@@ -84,6 +83,7 @@ OPENAI_MODEL=gpt-4.1-mini
 .venv/bin/python -m pytest --cov=jobflow --cov-report=term-missing
 .venv/bin/ruff check src tests
 .venv/bin/mypy src/jobflow
+.venv/bin/python -m pip check
 ```
 
 실제 HTTP 준비 상태를 확인하려면 앱을 실행한 터미널과 별도로 다음을 실행합니다. 포트는 실행 로그에 표시된 값으로 바꾸세요.
@@ -100,4 +100,5 @@ curl --fail http://127.0.0.1:7860/
 - `src/jobflow/services.py`: Parse/검토/일정 서비스 경계
 - `src/jobflow/ui.py`: Gradio Blocks, 세션 상태, 표·진단·결과 변환
 - `src/jobflow/app.py`: `.env` 로드와 loopback 실행 진입점
+- `DESIGN.md`: 색상, 상태, 반응형 달력, 접근성 토큰의 단일 명세
 - `docs/architecture.md`: 공유 모델과 정책의 규범 문서

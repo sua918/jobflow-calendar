@@ -7,14 +7,18 @@ import gradio as gr
 
 from jobflow.app import build_app, main
 from jobflow.models import ExtractionMethod, UnscheduledReason
+from jobflow.services import build_calendar_month_view
 from jobflow.ui import (
+    _parse_selected_month,
+    _render_calendar_view,
     apply_table_edits,
     invalidate_input,
     load_canonical_demo,
     parse_input,
+    render_calendar_month,
     schedule_review,
 )
-from jobflow.validation import validate_draft
+from jobflow.validation import to_schedule_request, validate_draft
 
 
 def test_build_app_constructs_without_openai_key(monkeypatch) -> None:
@@ -80,11 +84,12 @@ def test_parse_start_immediately_disables_confirmation_and_schedule() -> None:
 
     assert components["검토 완료"] in begin_parse["outputs"]
     assert components["규칙 기반 일정 만들기"] in begin_parse["outputs"]
-    assert components["2주 날짜별 일정"] in begin_parse["outputs"]
+    assert components["상세 일정"] in begin_parse["outputs"]
+    assert components["월간 달력"] in begin_parse["outputs"]
 
 
 def test_raw_input_invalidation_clears_stale_review_and_result() -> None:
-    invalidated = invalidate_input("2026-03-03 10:00", "2026-03-03")
+    invalidated = invalidate_input("2026-03-03 10:00", "2026-03")
 
     assert invalidated.report_json == ""
     assert invalidated.task_rows == []
@@ -95,10 +100,107 @@ def test_raw_input_invalidation_clears_stale_review_and_result() -> None:
     assert "입력이 바뀌어" in invalidated.diagnostics
 
 
+def test_selected_month_adapter_accepts_only_year_month() -> None:
+    selected = _parse_selected_month("2026-12")
+
+    assert (selected.year, selected.month) == (2026, 12)
+
+    for invalid in ("2026-12-01", "2026-2", "9999-01", "2026-13"):
+        try:
+            _parse_selected_month(invalid)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid month accepted: {invalid}")
+
+
+def test_calendar_is_semantic_monday_first_and_escapes_titles() -> None:
+    review = load_canonical_demo()
+    assert review.report is not None
+    result = schedule_review(review.report_json, confirmed=True)
+
+    assert result.result is not None
+    assert result.calendar_html.startswith('<section class="calendar-shell"')
+    assert 'role="grid"' in result.calendar_html
+    assert 'aria-label="월요일"' in result.calendar_html
+    assert 'class="calendar-day outside-month"' in result.calendar_html
+    assert 'data-source-id=' in result.calendar_html
+    assert 'category-label' in result.calendar_html
+
+
+
+def test_calendar_title_is_escaped_at_html_boundary() -> None:
+    review = load_canonical_demo()
+    task_rows = [row.copy() for row in review.task_rows]
+    task_rows[0][1] = '<img src=x onerror="alert(1)">'
+    edited = apply_table_edits(
+        review.report_json,
+        task_rows,
+        review.routine_rows,
+        review.availability_rows,
+        review.fixed_event_rows,
+    )
+
+    result = schedule_review(edited.report_json, confirmed=True)
+
+    assert "<img" not in result.calendar_html
+    assert "&lt;img" in result.calendar_html
+
+
+def test_calendar_overflow_control_exposes_ordered_extra_events() -> None:
+    review = load_canonical_demo()
+    assert review.report is not None
+    scheduled = schedule_review(review.report_json, confirmed=True)
+    assert scheduled.result is not None
+    month = build_calendar_month_view(
+        to_schedule_request(review.report), scheduled.result
+    ).model_copy(deep=True)
+    busy_day = next(day for day in month.days if day.events)
+    original = busy_day.events[0]
+    busy_day.events = [
+        original,
+        original.model_copy(update={"view_id": "test-overflow-2"}),
+        original.model_copy(update={"view_id": "test-overflow-3"}),
+        original.model_copy(update={"view_id": "test-overflow-4"}),
+    ]
+
+    rendered = _render_calendar_view(month)
+
+    assert '<details class="calendar-overflow">' in rendered
+    assert "+1개 더 보기" in rendered
+    assert rendered.count('data-source-id=') >= 4
+
+
+def test_month_render_handles_required_month_lengths_and_rollover() -> None:
+    month_cases = (
+        ("2024-02", 35),
+        ("2025-02", 35),
+        ("2026-04", 35),
+        ("2026-03", 42),
+        ("2026-12", 35),
+    )
+    for month, expected_cells in month_cases:
+        selected = _parse_selected_month(month)
+        review = load_canonical_demo()
+        assert review.report is not None
+        moved = review.report.model_copy(
+            update={
+                "context": review.report.context.model_copy(update={"selected_month": selected})
+            },
+            deep=True,
+        )
+        html = render_calendar_month(moved, None)
+
+        assert html.count('role="gridcell"') == expected_cells
+        assert f"{selected.year}년 {selected.month}월" in html
+        if month == "2026-12":
+            assert 'data-date="2027-01-' in html
+
+
 def test_missing_key_parse_returns_safe_korean_diagnostic(monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
 
-    view = asyncio.run(parse_input("비밀 원문", "2026-03-02 09:00", "2026-03-02"))
+    view = asyncio.run(parse_input("비밀 원문", "2026-03-02 09:00", "2026-03"))
 
     assert not view.ready
     assert "AI 추출을 사용할 수 없어요" in view.diagnostics
