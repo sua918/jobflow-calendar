@@ -34,10 +34,10 @@ Adopt a persistent calendar workspace plus a right-side composition drawer.
 - The calendar is mounted immediately after the top bar and never moves behind the entire input/review flow.
 - `일정 만들기` opens a progressive drawer with exactly three steps: `요청 입력 → 일정 확인 → 캘린더`.
 - Use Gradio 6.27's available `gr.Sidebar(position="right", width=440, open=False)` primitive with `elem_id="jf-compose-panel"`; do not emulate a modal with an always-visible column.
-- The drawer is non-modal on desktop and a modal overlay sheet on mobile. Desktop renders no scrim: users may inspect and operate the visible calendar by pointer or keyboard while editing. Mobile uses a dimming scrim, makes the background inert, and locks underlying document scroll while the sheet is open.
+- The drawer is non-modal on desktop and a modal overlay sheet on mobile. Desktop renders no scrim: users may inspect and operate the visible calendar by pointer or keyboard while editing. Mobile uses `role="dialog"`, `aria-modal="true"`, a dimming scrim, background inertness, focus containment, and underlying document scroll lock while the sheet is open.
 - Detailed schedule and unplaced diagnostics become independent collapsed disclosures below the calendar, not sibling primary tabs.
 
-Reasoning: the installed Gradio version provides a native collapsible Sidebar with expand/collapse events and a right position. It is more reliable than a custom dialog layered over Gradio portals. Its public API does not promise overlay/no-reflow or product focus restoration, so those are JobFlow-owned requirements rather than assumed framework behavior. On desktop, the rendered `#jf-compose-panel` root must be fixed to `top: 0; right: 0; bottom: 0`, width 440 px, and a product z-index above the workspace. It has `role="complementary"`, `aria-labelledby` pointing to its heading, no `aria-modal`, no scrim, and no background `inert`/`aria-hidden`; opening it must change the calendar bounding-box width and x-position by no more than 2 px. On mobile (`max-width: 700px`) it becomes modal, is fixed at `inset: 0`, and uses `width: 100dvw; max-width: none; height: 100dvh`; its scrim intercepts background pointer input while inertness/focus containment block keyboard access. Use the Sidebar `open` state/events for visibility; target no generated hash class. The implementation must add focus behavior through the owned IDs in section 8 and prove all geometry in section 12.
+Reasoning: the installed Gradio version provides a native collapsible Sidebar with expand/collapse events and a right position. It is more reliable than a custom dialog layered over Gradio portals. Its public API does not promise overlay/no-reflow, responsive ARIA mutation, or product focus restoration, so those are JobFlow-owned requirements rather than assumed framework behavior. On desktop, the rendered `#jf-compose-panel` root must be fixed to `top: 0; right: 0; bottom: 0`, width 440 px, and a product z-index above the workspace. It has `role="complementary"`, `aria-labelledby="jf-compose-title"`, no `aria-modal`, no scrim, and no background `inert`/`aria-hidden`; opening it must change the calendar bounding-box width and x-position by no more than 2 px. On mobile (`max-width: 700px`) it becomes `role="dialog"` with `aria-modal="true"` and the same label, is fixed at `inset: 0`, and uses `width: 100dvw; max-width: none; height: 100dvh`; its scrim intercepts background pointer input while inertness/focus containment block keyboard access. Use the Sidebar `open` state/events for visibility; target no generated hash class. The implementation must add focus and breakpoint-transition behavior through the owned IDs in section 8 and prove all geometry and ARIA state in section 12.
 
 ## 3. Information architecture
 
@@ -149,10 +149,11 @@ No other high-emphasis action appears while the drawer is closed.
 
 - Root and document `scrollWidth` must equal `clientWidth` (390 px at the target).
 - Outer gutter: 12 px; usable width: 366 px.
-- Compact top bar uses at most 104 px over two rows:
+- Compact top bar outer box is exactly 104 px high, overriding the 64 px desktop height, and contains two rows:
   - row 1, 48 px: identity, selected `YYYY-MM`, 40×40 `일정 만들기` icon/text control;
   - row 2, 48 px: previous, `이번 달`, next, and visible month title.
-- Calendar agenda begins no lower than y=116 px.
+  - the inter-row gap is 8 px; there is no additional vertical padding inside the 104 px box.
+- A 12 px gap follows the top bar, so the calendar agenda begins at y=116 px exactly.
 - Do not render a seven-column grid. At `max-width: 700px`, render selected-month dates chronologically and omit adjacent-month and event-free dates.
 - Each date group has a sticky-or-static 32 px date label followed by event rows of at least 44 px touch height.
 - Event titles wrap to at most two lines; then ellipsize. Full content remains in the accessible name and detail disclosure.
@@ -204,7 +205,8 @@ During scheduling, preserve the calendar's dimensions and show a centered progre
 - update the toolbar sentence/totals in one polite live region;
 - retain all exact unplaced entries and diagnostics in the closed disclosure;
 - show step 3 completion copy and `캘린더에서 보기`;
-- close the drawer and focus the calendar heading when the user activates that action.
+- keep the drawer open, advance to step 3, move focus to `#jf-step-calendar`, and announce completion once;
+- close the drawer and focus `#calendar-heading` only when the user activates `캘린더에서 보기`. The explicit close button and Escape remain available and instead restore the original opening trigger.
 
 Scheduling invariant failures show a generic safe error inside the calendar and keep the drawer at step 2 so the user can inspect diagnostics. No stack trace or raw provider payload is shown.
 
@@ -229,9 +231,10 @@ Closed workspace focus order:
 
 Drawer behavior:
 
-- Opening stores the trigger and moves focus to the drawer heading, then the first invalid control if reopening after validation.
-- Desktop Sidebar is non-modal: it has `role="complementary"` and `aria-labelledby`, but no `aria-modal`, scrim, background `inert`, or background `aria-hidden`. Focus may leave it for the calendar, and visible calendar controls remain pointer-operable; the close control is always first inside.
-- Mobile sheet is modal in behavior: a dim scrim intercepts background pointer input, the background receives `inert` and `aria-hidden="true"`, and Tab/Shift+Tab remain within the sheet.
+- Opening stores the trigger and moves focus to `#jf-compose-title`, then the first invalid control if reopening after validation.
+- Desktop Sidebar is non-modal: it has `role="complementary"` and `aria-labelledby="jf-compose-title"`, but no `aria-modal`, scrim, background `inert`, or background `aria-hidden`. Focus may leave it for the calendar, and visible calendar controls remain pointer-operable; the close control is always first inside.
+- Mobile sheet is modal in semantics and behavior: `#jf-compose-panel` changes to `role="dialog"`, sets `aria-modal="true"`, and retains `aria-labelledby="jf-compose-title"`; a dim scrim intercepts background pointer input, `#jf-page-content` receives `inert` and `aria-hidden="true"`, and Tab/Shift+Tab remain within the sheet. The panel and scrim must be siblings of `#jf-page-content`, never descendants hidden by that attribute.
+- If an open panel crosses from above 700 px to 700 px or below, update role/modality, add the scrim and background states, lock scroll, and enable the focus trap without changing the active step or field values; if focus was outside the panel, move it to `#jf-compose-title`, otherwise preserve it. Crossing back above 700 px changes the role to `complementary`, removes `aria-modal` (do not set it to `false`), removes the scrim, `inert`, `aria-hidden`, scroll lock, and focus trap, and preserves the current focus and step. Neither transition closes or reopens the panel.
 - Escape closes the drawer unless an owned nested disclosure/editor is consuming Escape. Closing returns focus to the original `일정 만들기` trigger.
 - Step changes move focus to the new step heading, not the first table cell.
 - Scheduling completion is announced once through `aria-live="polite"`; errors use `role="alert"`. Do not duplicate announcements in separate summary and stats inputs.
@@ -316,6 +319,7 @@ Implementation and browser tests use explicit owned IDs/classes rather than gene
 | Element | Required selector/contract |
 |---|---|
 | Application root | `.jf-app` |
+| Background page content | `#jf-page-content` (sibling of the panel/scrim) |
 | Top bar | `#jf-topbar` (`header`) |
 | Previous/current/next | `#jf-month-prev`, `#jf-month-current`, `#jf-month-next` |
 | Selected month text/control | `#jf-selected-month` |
@@ -325,6 +329,7 @@ Implementation and browser tests use explicit owned IDs/classes rather than gene
 | Calendar heading | `#calendar-heading` |
 | Compact status/live region | `#jf-calendar-status` |
 | Composition Sidebar | `#jf-compose-panel` |
+| Composition label | `#jf-compose-title` (`일정 만들기`) |
 | Drawer close | `#jf-compose-close` |
 | Step headings | `#jf-step-request`, `#jf-step-review`, `#jf-step-calendar` |
 | Confirmation wrapper | `.jf-checkbox` |
@@ -347,7 +352,9 @@ Tests must inspect a real browser after the canonical keyless flow, not only sea
 | Font | computed `.jf-app` font family starts with `Pretendard` or `"Pretendard Variable"`; browser fallback list contains system options; no remote font required | same |
 | Overflow | `documentElement.scrollWidth === documentElement.clientWidth`; calendar itself does not clip focus ring | same; drawer table may internally scroll |
 | Primary action | exactly one visible primary/high-emphasis action while drawer closed | same |
-| Drawer default/focus | closed at load; opening focuses heading; no scrim/`aria-modal`/background inertness; calendar remains pointer/keyboard available; Escape closes and restores trigger | full-width modal sheet; intercepting scrim; background inert; Tab contained |
+| Drawer default/focus and ARIA | closed at load; opening focuses `#jf-compose-title`; `role=complementary`, `aria-labelledby=jf-compose-title`, no `aria-modal`/scrim/background inertness; calendar remains pointer/keyboard available; Escape closes and restores trigger | full-width sheet with `role=dialog`, `aria-modal=true`, `aria-labelledby=jf-compose-title`; intercepting scrim; `#jf-page-content` inert and `aria-hidden=true`; Tab contained; Escape closes and restores trigger |
+| Open breakpoint transition | crossing to mobile preserves step/data, changes to dialog semantics, adds modal behaviors, and moves outside focus to the panel title; crossing back preserves step/focus and removes every modal attribute/behavior | test at 700/701 px without closing: role, `aria-modal`, scrim, inertness, `aria-hidden`, scroll lock, and focus trap all match the active side of the breakpoint |
+| Scheduling success | panel remains open on step 3; focus is `#jf-step-calendar`; `캘린더에서 보기` closes and focuses `#calendar-heading`; close/Escape restore the trigger | same |
 | Drawer no-reflow | opening changes calendar x/width by ≤2 px; owned fixed panel is 440±2 px wide | at 390 px, sheet is 390±2 px wide and fixed to viewport; at every tested 391–700 px width, sheet width equals `documentElement.clientWidth` ±2 px |
 | Calendar state stability | empty/loading/error/success outer shell dimensions differ by no more than 2 px at same viewport/month | same agenda container rule |
 | Event semantics | visible category icon/text plus subdued left border; escaped title; stable source/view IDs | same |

@@ -85,11 +85,16 @@ components:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.text}"
     typography: "{typography.body}"
-  topbar:
+  topbar-desktop:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.text}"
     height: 64px
     padding: 16px
+  topbar-mobile:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    height: 104px
+    padding: 0px
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "#FFFFFF"
@@ -227,9 +232,9 @@ At 1440×1000:
 
 At 390×844:
 
-- viewport gutters: 12 px; top bar: 56 px;
-- product identity, month label, previous/next controls, and primary action fit in two compact rows totaling at most 104 px;
-- calendar/agenda starts no lower than 116 px and uses the remaining viewport;
+- viewport gutters: 12 px; the top bar outer box is exactly 104 px high, overriding the 64 px desktop `topbar-desktop` token with `topbar-mobile`;
+- within that 104 px box, product identity, selected month, and primary action occupy a 48 px first row; previous/current/next controls and the visible month title occupy a 48 px second row; the rows have an 8 px gap and no additional vertical padding;
+- a 12 px gap follows the top bar, so the calendar/agenda starts at y = 116 px and uses the remaining viewport;
 - month grid becomes a chronological selected-month agenda below 700 px; event-free dates and adjacent-month dates are omitted;
 - open composition panel is a full-viewport sheet (`position: fixed; inset: 0; width: 100dvw; max-width: none; height: 100dvh`) throughout the `max-width: 700px` breakpoint, with its own vertical scroll; underlying calendar scroll is locked. At the 390 px acceptance viewport its measured width is 390±2 px; at 391–700 px it continues to equal the viewport width rather than remaining capped at 390 px.
 
@@ -271,7 +276,9 @@ Desktop uses a Monday-first seven-column month grid with 35 or 42 cells. Show at
 
 ### Composition panel
 
-Use Gradio 6.27's native `gr.Sidebar(position="right", width=440, open=False)` as the drawer primitive, with owned ID `jf-compose-panel`. It is closed on first load. On desktop it is a non-modal complementary region: render no scrim, do not set `aria-modal`, and do not make the calendar inert; pointer and keyboard interaction with the visible calendar remain available. The explicit close button and Escape dismiss it and restore the opening trigger. The primary action opens it at step 1; scheduling success closes it and returns focus to the primary action/calendar heading. Do not invent a second desktop form column.
+Use Gradio 6.27's native `gr.Sidebar(position="right", width=440, open=False)` as the drawer primitive, with owned ID `jf-compose-panel`. It is closed on first load and is labelled by the persistent `#jf-compose-title` heading (`일정 만들기`). Above 700 px it is a non-modal region with `role="complementary"`, `aria-labelledby="jf-compose-title"`, and no `aria-modal` attribute: render no scrim, do not make the calendar inert, and keep the visible calendar available to pointer and keyboard users. At 700 px and below it is a modal sheet with `role="dialog"`, `aria-modal="true"`, and the same `aria-labelledby`; an intercepting scrim, background `inert`/`aria-hidden="true"`, scroll lock, and a focus trap are required. While the panel is open, crossing the breakpoint updates these attributes and behaviors without closing it, resetting its active step, or losing entered data. Desktop-to-mobile moves focus to `#jf-compose-title` only when focus was outside the panel; mobile-to-desktop preserves focus and removes the trap, scrim, inertness, and background `aria-hidden`. The explicit close button and Escape dismiss the panel and restore the opening trigger.
+
+Successful or partially successful scheduling does not close the panel. It updates the calendar, advances to step 3, moves focus to `#jf-step-calendar`, and announces completion once. Step 3 remains observable until the user activates `캘린더에서 보기` (close and focus `#calendar-heading`), the explicit close button, or Escape; the latter two restore the opening trigger. Do not invent a second desktop form column.
 
 The panel has a sticky 56 px header, explicit close button, stepper, one scrollable body, and sticky 64 px footer. Only one step's primary content is expanded:
 

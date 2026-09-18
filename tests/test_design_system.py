@@ -54,6 +54,27 @@ def test_calendar_first_design_spec_defines_required_palette_and_font() -> None:
     for token, value in CALENDAR_FIRST_TOKENS.items():
         assert frontmatter["colors"][token] == value
     assert frontmatter["typography"]["body"]["fontFamily"].startswith("Pretendard")
+    assert frontmatter["components"]["topbar-desktop"]["height"] == "64px"
+    assert frontmatter["components"]["topbar-mobile"]["height"] == "104px"
+
+
+def test_calendar_first_contract_defines_responsive_modality_and_step_three() -> None:
+    design = (ROOT / "DESIGN.md").read_text(encoding="utf-8")
+    ux_contract = (ROOT / "docs" / "calendar-first-ui.md").read_text(
+        encoding="utf-8"
+    )
+
+    for contract in (design, ux_contract):
+        assert 'role="complementary"' in contract
+        assert 'role="dialog"' in contract
+        assert 'aria-modal="true"' in contract
+        assert 'aria-labelledby="jf-compose-title"' in contract
+
+    assert "does not close the panel" in design
+    assert "advances to step 3" in design
+    assert "keep the drawer open, advance to step 3" in ux_contract
+    assert "focus `#calendar-heading` only when" in ux_contract
+    assert "test at 700/701 px without closing" in ux_contract
 
 
 def test_current_css_palette_stays_guarded_until_redesign_implementation() -> None:
