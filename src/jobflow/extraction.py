@@ -50,6 +50,30 @@ def _build_runnable() -> ExtractionRunnable:
     return cast(ExtractionRunnable, prompt | model.with_structured_output(ExtractionDraft))
 
 
+def _assign_deterministic_ids(draft: ExtractionDraft) -> ExtractionDraft:
+    return draft.model_copy(
+        update={
+            "deadline_tasks": [
+                item.model_copy(update={"id": f"task-{index:02d}"}, deep=True)
+                for index, item in enumerate(draft.deadline_tasks, start=1)
+            ],
+            "recurring_routines": [
+                item.model_copy(update={"id": f"routine-{index:02d}"}, deep=True)
+                for index, item in enumerate(draft.recurring_routines, start=1)
+            ],
+            "availability": [
+                item.model_copy(update={"id": f"availability-{index:02d}"}, deep=True)
+                for index, item in enumerate(draft.availability, start=1)
+            ],
+            "fixed_events": [
+                item.model_copy(update={"id": f"fixed-{index:02d}"}, deep=True)
+                for index, item in enumerate(draft.fixed_events, start=1)
+            ],
+        },
+        deep=True,
+    )
+
+
 async def extract_draft(text: str, context: ParseContext) -> ExtractionDraft:
     """Perform exactly one structured model call and return a typed draft."""
     if not text.strip():
@@ -66,9 +90,12 @@ async def extract_draft(text: str, context: ParseContext) -> ExtractionDraft:
                 "timezone": context.timezone,
             }
         )
-        if isinstance(raw, ExtractionDraft):
-            return raw
-        return ExtractionDraft.model_validate(cast(Any, raw))
+        draft = (
+            raw
+            if isinstance(raw, ExtractionDraft)
+            else ExtractionDraft.model_validate(cast(Any, raw))
+        )
+        return _assign_deterministic_ids(draft)
     except ExtractionError:
         raise
     except Exception:
