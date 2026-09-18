@@ -1,77 +1,305 @@
-# JobFlow Design System
+---
+version: alpha
+name: JobFlow Calendar First
+description: Restrained Korean productivity UI in which the selected-month calendar is the primary workspace.
+colors:
+  primary: "#2563EB"
+  primaryHover: "#1D4ED8"
+  primarySoft: "#EFF6FF"
+  canvas: "#F7F8FA"
+  surface: "#FFFFFF"
+  surfaceSubtle: "#FAFAFA"
+  text: "#18181B"
+  textMuted: "#52525B"
+  border: "#D4D4D8"
+  borderStrong: "#A1A1AA"
+  focus: "#1D4ED8"
+  disabled: "#F4F4F5"
+  disabledText: "#52525B"
+  warning: "#92400E"
+  warningSoft: "#FFFBEB"
+  today: "#1E3A8A"
+  todaySoft: "#DBEAFE"
+  outsideMonth: "#71717A"
+  loading: "#E4E4E7"
+  danger: "#B42318"
+  dangerSoft: "#FEF3F2"
+  deadline: "#2563EB"
+  deadlineSoft: "#EFF6FF"
+  routine: "#047857"
+  routineSoft: "#ECFDF5"
+  fixed: "#A16207"
+  fixedSoft: "#FFFBEB"
+typography:
+  display:
+    fontFamily: 'Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 24px
+    fontWeight: 700
+    lineHeight: 1.25
+    letterSpacing: "-0.02em"
+  heading:
+    fontFamily: 'Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 18px
+    fontWeight: 700
+    lineHeight: 1.4
+    letterSpacing: "-0.01em"
+  title:
+    fontFamily: 'Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 16px
+    fontWeight: 600
+    lineHeight: 1.5
+    letterSpacing: "-0.01em"
+  body:
+    fontFamily: 'Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 14px
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: "-0.005em"
+  label:
+    fontFamily: 'Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 13px
+    fontWeight: 600
+    lineHeight: 1.4
+    letterSpacing: "-0.005em"
+  meta:
+    fontFamily: 'Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
+    fontSize: 12px
+    fontWeight: 400
+    lineHeight: 1.4
+    letterSpacing: "0em"
+spacing:
+  xxs: 4px
+  xs: 8px
+  sm: 12px
+  md: 16px
+  lg: 24px
+  xl: 32px
+  xxl: 48px
+rounded:
+  sm: 6px
+  md: 8px
+  lg: 12px
+  pill: 999px
+components:
+  app-canvas:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.text}"
+    typography: "{typography.body}"
+  topbar:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    height: 64px
+    padding: 16px
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "#FFFFFF"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    padding: 12px
+    height: 40px
+  button-primary-hover:
+    backgroundColor: "{colors.primaryHover}"
+    textColor: "#FFFFFF"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    padding: 12px
+    height: 40px
+  button-secondary:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    padding: 12px
+    height: 40px
+  calendar:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.lg}"
+    padding: 0px
+  calendar-event-deadline:
+    backgroundColor: "{colors.deadlineSoft}"
+    textColor: "{colors.text}"
+    typography: "{typography.meta}"
+    rounded: "{rounded.sm}"
+    padding: 6px
+  calendar-event-routine:
+    backgroundColor: "{colors.routineSoft}"
+    textColor: "{colors.text}"
+    typography: "{typography.meta}"
+    rounded: "{rounded.sm}"
+    padding: 6px
+  calendar-event-fixed:
+    backgroundColor: "{colors.fixedSoft}"
+    textColor: "{colors.text}"
+    typography: "{typography.meta}"
+    rounded: "{rounded.sm}"
+    padding: 6px
+  status-error:
+    backgroundColor: "{colors.dangerSoft}"
+    textColor: "{colors.danger}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    padding: 12px
+  interaction-soft:
+    backgroundColor: "{colors.primarySoft}"
+  surface-subtle:
+    backgroundColor: "{colors.surfaceSubtle}"
+  text-muted:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.textMuted}"
+  border-default:
+    backgroundColor: "{colors.border}"
+  border-strong:
+    backgroundColor: "{colors.borderStrong}"
+  focus-ring:
+    backgroundColor: "{colors.focus}"
+  deadline-marker:
+    backgroundColor: "{colors.deadline}"
+  routine-marker:
+    backgroundColor: "{colors.routine}"
+  fixed-marker:
+    backgroundColor: "{colors.fixed}"
+  button-disabled:
+    backgroundColor: "{colors.disabled}"
+    textColor: "{colors.disabledText}"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    height: 40px
+  status-warning:
+    backgroundColor: "{colors.warningSoft}"
+    textColor: "{colors.warning}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    padding: 12px
+  calendar-today:
+    backgroundColor: "{colors.todaySoft}"
+    textColor: "{colors.today}"
+  calendar-outside-month:
+    backgroundColor: "{colors.surfaceSubtle}"
+    textColor: "{colors.outsideMonth}"
+  loading-placeholder:
+    backgroundColor: "{colors.loading}"
+---
 
-This file is the single source of truth for the JobFlow Gradio interface. The direction is calm, professional productivity software: light surfaces, restrained elevation, direct language, and no decorative AI gradients.
+## Overview
 
-## Principles
+JobFlow is a calendar workspace, not a form dashboard. The selected month is visible immediately, occupies the dominant surface, and remains in place while a compact right-side composition panel handles `요청 입력 → 일정 확인 → 캘린더`. The visual reference is restrained Cal.com/Notion-style productivity software: neutral surfaces, dense-but-readable controls, and one calm blue interaction accent. Do not use gradients, purple AI styling, oversized hero cards, or repeated status boxes.
 
-1. Put the selected month and deterministic result first.
-2. Keep review, detail, and failure information visible rather than optimistic.
-3. Never communicate category, warning, selection, or status by color alone.
-4. Preserve readable text and 44 px targets at narrow widths.
-5. Escape all user-authored strings before they enter custom HTML.
+The root font stack is local-first and must be applied to `.gradio-container` and all form controls:
 
-## Color tokens
+`Pretendard, "Pretendard Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`
 
-```css
---jf-ink: #0F172A;
---jf-muted: #475569;
---jf-border: #CBD5E1;
---jf-surface: #FFFFFF;
---jf-surface-soft: #F8FAFC;
---jf-primary: #4F46E5;
---jf-focus: #4F46E5;
---jf-deadline: #0072B2;
---jf-deadline-bg: #E6F4FB;
---jf-routine: #009E73;
---jf-routine-bg: #E7F6F1;
---jf-fixed: #9A6700;
---jf-fixed-bg: #FFF4D6;
---jf-warning: #D55E00;
---jf-warning-bg: #FDECE7;
-```
+Pretendard is preferred when installed; core usability must not depend on a remote font request. The browser may resolve to a system Korean sans fallback without layout failure.
 
-Automated WCAG 2.1 AA checks cover ink on white, white on primary, and ink on every category/warning surface. Borders are reinforcement, not text. Warning/unplaced content uses the vermillion border plus an explicit warning label and deterministic reason text.
+## Colors
+
+- Canvas is `#F7F8FA`; primary surfaces are white; structural lines use `#D4D4D8`.
+- Main text is charcoal `#18181B`; secondary text is `#52525B`. Never use low-opacity gray for essential text.
+- `#2563EB` is the only general interaction accent. Reserve it for the primary action, selected/focus states, links, and today/selection emphasis.
+- Schedule category color is semantic and subdued. Deadline, routine, and fixed events use pale surfaces plus a 3 px left border, visible icon, and Korean category text. Never use a large saturated fill and never encode category by color alone.
+- Error and unplaced states use `#B42318` text or border on `#FEF3F2`, always with an icon/label and deterministic message.
+- Warning/partial states use `#92400E` on `#FFFBEB`; today uses `#1E3A8A` on `#DBEAFE`; outside-month text uses `#71717A` on the subtle surface; disabled controls use `#52525B` on `#F4F4F5`; loading placeholders use solid `#E4E4E7` without a gradient.
+- Text/background pairs must meet WCAG 2.1 AA: 4.5:1 for normal text and 3:1 for large text. Focus and component boundaries must meet 3:1 against adjacent colors.
 
 ## Typography
 
-Use Gradio's system sans stack. Body text is at least 1 rem. Headings use weight 700 and slightly tightened tracking. Supporting labels may use 0.72–0.8 rem only when the event title and time remain separately readable. Never place essential information only in a tooltip.
+- Product identity: 18 px/700 on desktop, 16 px/700 on mobile. It is not a marketing H1.
+- Selected month: 24 px/700 desktop, 20 px/700 mobile.
+- Panel/section heading: 18 px/700.
+- Calendar date and event title: 13 px/600 and 12 px/600 respectively.
+- Body/control copy: 14 px/400; labels 13 px/600; metadata 12 px/400.
+- Use tabular numbers for dates, times, month values, and minute totals.
+- Korean labels wrap only in the side panel. Top-bar labels and event titles truncate to one line with the full accessible name preserved.
 
-## Spacing and shape
+## Layout
 
-Use a 4 px base rhythm. Common gaps are 8, 12, 16, and 24 px. Controls have at least 44 px height. Cards use 10–16 px radii and a 1 px neutral border. Shadows are reserved for the hero or major grouping and remain subtle.
+Use an 8 px primary rhythm with 4 px only for tight icon/text relationships. Standard gaps are 8, 12, 16, 24, 32, and 48 px.
 
-## Interaction states
+At 1440×1000:
 
-- Default: white surface, ink text, neutral border.
-- Hover: neutral `#F1F5F9` surface; content and border remain visible.
-- Focus: 3 px primary-indigo outline with 2 px offset on controls, tabs, overflow summaries, and calendar events.
-- Selected: Gradio tab/field selection uses primary-indigo emphasis plus text or structure; not color alone.
-- Today: inset primary ring and filled circular date marker, while the full date remains in accessible text.
-- Outside month: muted neutral surface and date; no events.
-- Disabled: native disabled semantics and Gradio state; buttons cannot be the sole indication that validation is blocked.
-- Loading: live status text on a restrained neutral/indigo surface.
-- Empty: explicit status text and outlined placeholder.
-- Warning/error: deterministic label/code and message on a pale warning surface; color is supplemental.
+- viewport gutters: 24 px; workspace maximum: 1600 px; calendar expands full-width within those gutters;
+- top bar: 64 px high;
+- gap below top bar: 16 px;
+- calendar workspace: at least 824 px high and at least 70% of visible workspace area;
+- calendar toolbar: 56 px; weekday row: 36 px; six-row month cells: at least 112 px high; five-row months grow to use available height;
+- closed right panel consumes no layout width; open panel is 440 px wide and overlays the calendar with a scrim rather than shrinking it.
 
-## Calendar components
+At 390×844:
 
-The desktop month grid is Monday-first with seven equal columns and exactly 35 or 42 date cells. Adjacent-month cells remain present, muted, and event-free. Each event chip includes:
+- viewport gutters: 12 px; top bar: 56 px;
+- product identity, month label, previous/next controls, and primary action fit in two compact rows totaling at most 104 px;
+- calendar/agenda starts no lower than 116 px and uses the remaining viewport;
+- month grid becomes a chronological selected-month agenda below 700 px; event-free dates and adjacent-month dates are omitted;
+- open composition panel is a full-width sheet (`100dvw`, maximum 390 px) with its own vertical scroll; underlying calendar scroll is locked.
 
-- a visible icon and Korean category label (`◆ 마감 작업`, `↻ 반복 일정`, or `■ 고정 일정`),
-- escaped title,
-- local `HH:MM–HH:MM`,
-- category border and pale surface,
-- stable source/view IDs as data attributes for traceability,
-- a Korean accessible name containing category, title, and complete interval.
+The document itself must never scroll horizontally. Data tables may scroll inside their own panel region, but the default calendar/result surface must not.
 
-Show at most three compact chips before a native keyboard-operable `details/summary` “+N개 더 보기” control. Titles ellipsize on desktop while focus/accessibility text retains the complete value. Split fixed events include visible and named continuation arrows.
+## Elevation & Depth
 
-At widths up to 700 px, switch to a vertical date agenda: hide event-free adjacent-month cells, keep selected-month date groups in chronological order, wrap long titles, and avoid horizontal scrolling. This is the approved responsive treatment rather than shrinking seven columns beyond legibility.
+Use borders before shadows. The top bar has a 1 px bottom border. The calendar has one 1 px border and no card-within-card treatment. The open side panel may use `-8px 0 24px rgba(24, 24, 27, 0.10)`; no other large shadow is allowed. Event chips and collapsed disclosures have no shadow.
 
-## Result hierarchy
+## Shapes
 
-The first/default tab is `월간 달력`. `상세 일정` retains chronological block data. `미배치 및 진단` retains exact reasons, details, remaining minutes, and diagnostics. Summary and minute totals stay above all tabs.
+- Buttons, inputs, and disclosures: 8 px radius.
+- Calendar shell: 12 px radius; day cells have no individual radius.
+- Event chips: 6 px radius with a 3 px semantic left border.
+- Status badge only: 999 px pill.
+- Borders are 1 px. Do not surround every section with a card border.
 
-## Accessibility verification
+Exact component states: secondary hover uses `surfaceSubtle`; selected uses `primarySoft` plus a blue structural marker; today, outside-month, disabled, warning, error, and loading use the named token pairs above. Focus-visible always uses `focus`. Disabled and outside-month content remains readable and is additionally communicated by native state or structure.
 
-Automated tests verify token presence, WCAG AA contrast, semantic grid labels, Monday-first headings, escaped event content, visible non-color category labels, focus CSS, 44 px targets, empty/loading states, overflow controls, ellipsis/wrapping, and the mobile breakpoint. Release verification additionally captures desktop and mobile screenshots and checks keyboard tab order, focus visibility, grayscale recognizability, and no horizontal clipping.
+Native checkbox and radio controls are exactly 18×18 px, with `min-width`, `max-width`, `min-height`, and `max-height` all 18 px and `aspect-ratio: 1 / 1`. The 44 px touch target belongs to the wrapping label, not the native input.
+
+Never use global selectors such as `input { min-height: 44px; }` or `button, input, textarea { ... }`. Scope form CSS through owned component IDs/classes. The allowed control selector is:
+
+`.jf-app :where(.jf-checkbox, .jf-radio) input:is([type="checkbox"], [type="radio"])`
+
+A Gradio-specific fallback may additionally target `[data-testid="checkbox"] input[type="checkbox"]` only inside `.jf-app`. Textbox, file, hidden, and dataframe inputs must not inherit checkbox geometry.
+
+## Components
+
+### Top bar
+
+One compact `header` contains, in focus/DOM order: JobFlow identity; previous month; current month; next month; read-only selected `YYYY-MM`; and one primary `일정 만들기` action. “Today” uses the visible label `이번 달`. Do not render a hero, introductory paragraph, context card, summary card, or statistics card above the calendar.
+
+### Calendar workspace
+
+The calendar is first in DOM order after the top bar and is present in empty, loading, success, partial, and error states. Empty/loading/error messages render inside the calendar body without changing its outer dimensions. A single compact status line in the calendar toolbar may show `요청 · 배치 · 미배치` totals after scheduling; it is not a separate box.
+
+Desktop uses a Monday-first seven-column month grid with 35 or 42 cells. Show at most three events per day before the existing keyboard-operable `+N개 더 보기` disclosure. Mobile uses chronological date groups. Titles truncate on desktop and wrap to two lines on mobile; full text remains in `aria-label`/accessible content.
+
+### Composition panel
+
+Use Gradio 6.27's native `gr.Sidebar(position="right", width=440, open=False)` as the drawer primitive, with owned ID `jf-compose-panel`. It is closed on first load. The primary action opens it at step 1; scheduling success closes it and returns focus to the primary action/calendar heading. Do not invent a second desktop form column.
+
+The panel has a sticky 56 px header, explicit close button, stepper, one scrollable body, and sticky 64 px footer. Only one step's primary content is expanded:
+
+1. `요청 입력`: request textarea, selected month, reference time, privacy/cost disclosure, AI parse action, and keyless demo action.
+2. `일정 확인`: editable task/routine/availability/fixed-event regions, field diagnostics adjacent to affected content, and explicit `검토 완료` checkbox.
+3. `캘린더`: scheduling progress/result, compact totals, and `캘린더에서 보기` close/focus action.
+
+Review tables may use collapsed subsections inside step 2, but the subsection containing the first error opens automatically. Existing edit, confirmation, invalidation, keyless demo, bounds, and no-provider behavior remain unchanged.
+
+### Secondary details
+
+`상세 일정` and `미배치 및 진단` are two independent native `details` disclosures below the calendar, both closed by default. Their summaries show counts; unplaced/error count may use a subdued semantic badge. Opening either must not alter the calendar's dimensions. Tables scroll inside a bounded region with sticky headers.
+
+## Do's and Don'ts
+
+Do:
+
+- keep the calendar mounted and visually stable across all states;
+- keep one high-emphasis action per viewport;
+- use native buttons, labels, checkbox/radio semantics, and `details/summary` where practical;
+- preserve exact scheduling, diagnostics, source IDs, and escaped content;
+- test computed geometry and font stacks in a real browser at 1440×1000 and 390×844.
+
+Don't:
+
+- restore the hero or the separate “결정적 요약” and “통계” boxes;
+- place all four editable tables in the initial document flow;
+- use tabs as the primary calendar/detail hierarchy;
+- apply `min-height` to every `input` or style Gradio internals outside `.jf-app`;
+- rely on remote fonts, color alone, hover alone, or placeholder text for instructions;
+- shrink a seven-column month grid onto a 390 px viewport;
+- hide unplaced work, diagnostics, the keyless demo, or the privacy/cost disclosure.

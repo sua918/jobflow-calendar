@@ -390,6 +390,16 @@ Dark ink on the specified pale surfaces has stated contrast `15.58:1..16.29:1`. 
 
 Required states are default, hover, keyboard focus-visible, selected, today, outside-month, disabled, error, and warning. Focus indicators must remain visible against every surface. Controls and event targets meet WCAG target-size guidance, support keyboard-only operation, and preserve meaningful reading order. The month grid is responsive at desktop and mobile widths, has no horizontal clipping, and keeps event text/readability usable rather than shrinking seven columns beyond recognition; a responsive agenda treatment is permitted on narrow screens if month navigation and date grouping remain clear. Frontend acceptance includes screenshot/visual verification at representative desktop and mobile widths.
 
+### 8.3 Calendar-first presentation addendum
+
+The build-ready presentation contract is [`docs/calendar-first-ui.md`](calendar-first-ui.md), with normative tokens in the root [`DESIGN.md`](../DESIGN.md). It supersedes the earlier visual placement described in sections 8 and 8.2 without changing their domain, calendar projection, accessibility, or data-availability requirements.
+
+The default document is a persistent calendar workspace: a compact 64 px top bar, one high-emphasis `일정 만들기` action, and a full-width selected-month calendar directly beneath it. The request, editable review, and completion states move into a closed-by-default right `gr.Sidebar` flow (`요청 입력 → 일정 확인 → 캘린더`). The separate hero, standalone deterministic-summary box, standalone statistics box, and primary result tabs are removed. The same summary/statistics data becomes one compact calendar-toolbar live region; detailed schedule and exact unplaced diagnostics remain available in two independent disclosures below the calendar, both closed by default.
+
+At the 1440×1000 target, the calendar starts no lower than 96 px, is at least 760 px visibly tall, spans at least 95% of the usable workspace, and occupies at least 70% of the first-viewport area below the top bar. At 390×844, the top controls use no more than 104 px, the chronological agenda starts no lower than 116 px, and the document has no horizontal overflow. The mobile drawer is a full-viewport sheet; the desktop drawer is 440 px and overlays rather than shrinking the calendar.
+
+Form-control styling is scoped to owned `.jf-app` component classes. Native checkbox/radio boxes are 18×18 px with a 44 px wrapper target. Bare/global `input` sizing is prohibited because Gradio Dataframes contain internal checkbox, file, and hidden inputs. Real-browser acceptance must measure the calendar geometry, first-surface order, closed secondary disclosures, Pretendard-first computed stack, square controls, focus restoration/containment, and document `scrollWidth === clientWidth` at both target viewports.
+
 ## 9. Error model, privacy, secrets, and cost
 
 Expected user/provider errors become `Diagnostic` entries and Korean UI messages. Programming invariant failures raise an internal exception, are logged without raw user text, and become generic `INTERNAL_SCHEDULE_INVALID` at the UI boundary. Do not expose stack traces or provider payloads in Gradio.

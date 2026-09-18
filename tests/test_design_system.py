@@ -3,15 +3,29 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import yaml
+
 from jobflow.ui import APP_CSS
 
 ROOT = Path(__file__).resolve().parents[1]
-REQUIRED_TOKENS = {
+IMPLEMENTED_BASELINE_TOKENS = {
     "--jf-ink": "#0F172A",
     "--jf-primary": "#4F46E5",
     "--jf-deadline": "#0072B2",
     "--jf-routine": "#009E73",
     "--jf-warning": "#D55E00",
+}
+CALENDAR_FIRST_TOKENS = {
+    "primary": "#2563EB",
+    "canvas": "#F7F8FA",
+    "surface": "#FFFFFF",
+    "text": "#18181B",
+    "textMuted": "#52525B",
+    "border": "#D4D4D8",
+    "focus": "#1D4ED8",
+    "deadlineSoft": "#EFF6FF",
+    "routineSoft": "#ECFDF5",
+    "fixedSoft": "#FFFBEB",
 }
 
 
@@ -32,22 +46,34 @@ def _contrast(first: str, second: str) -> float:
     return (high + 0.05) / (low + 0.05)
 
 
-def test_design_spec_and_css_use_required_palette() -> None:
+def test_calendar_first_design_spec_defines_required_palette_and_font() -> None:
     spec = (ROOT / "DESIGN.md").read_text(encoding="utf-8")
+    frontmatter = yaml.safe_load(spec.split("---", maxsplit=2)[1])
 
-    for token, value in REQUIRED_TOKENS.items():
-        assert value in spec
+    for token, value in CALENDAR_FIRST_TOKENS.items():
+        assert frontmatter["colors"][token] == value
+    assert frontmatter["typography"]["body"]["fontFamily"].startswith("Pretendard")
+
+
+def test_current_css_palette_stays_guarded_until_redesign_implementation() -> None:
+    for token, value in IMPLEMENTED_BASELINE_TOKENS.items():
         assert re.search(rf"{re.escape(token)}:\s*{value}", APP_CSS, re.IGNORECASE)
 
 
 def test_required_text_and_surface_pairs_meet_wcag_aa() -> None:
     pairs = {
-        "body": ("#0F172A", "#FFFFFF"),
-        "primary-button": ("#FFFFFF", "#4F46E5"),
-        "deadline-chip": ("#0F172A", "#E6F4FB"),
-        "routine-chip": ("#0F172A", "#E7F6F1"),
-        "fixed-chip": ("#0F172A", "#FFF4D6"),
-        "warning": ("#0F172A", "#FDECE7"),
+        "body": ("#18181B", "#FFFFFF"),
+        "muted": ("#52525B", "#FFFFFF"),
+        "primary-button": ("#FFFFFF", "#2563EB"),
+        "primary-button-hover": ("#FFFFFF", "#1D4ED8"),
+        "deadline-chip": ("#18181B", "#EFF6FF"),
+        "routine-chip": ("#18181B", "#ECFDF5"),
+        "fixed-chip": ("#18181B", "#FFFBEB"),
+        "warning": ("#92400E", "#FFFBEB"),
+        "error": ("#B42318", "#FEF3F2"),
+        "today": ("#1E3A8A", "#DBEAFE"),
+        "outside-month": ("#71717A", "#FAFAFA"),
+        "disabled": ("#52525B", "#F4F4F5"),
     }
 
     failures = {
