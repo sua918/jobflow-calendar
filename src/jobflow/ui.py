@@ -226,9 +226,7 @@ html, body { margin: 0; background: var(--jf-canvas); overflow-x: hidden; }
   color: var(--jf-ink); font-weight: 600; cursor: pointer; border-bottom: 1px solid transparent; }
 .jf-secondary[open] > summary { border-bottom-color: var(--jf-border); }
 .jf-details-body { max-height: 440px; overflow: auto; padding: 12px; }
-#jf-schedule-details-body, #jf-unplaced-details-body { display: none !important; }
-#jf-schedule-details-body.jf-details-expanded,
-#jf-unplaced-details-body.jf-details-expanded { display: flex !important; }
+.jf-details-body[hidden] { display: none !important; }
 #jf-compose-panel { position: fixed !important; top: 0 !important; right: -440px !important;
   bottom: 0 !important; left: auto !important; width: 440px !important; max-width: 440px !important;
   height: 100dvh !important; z-index: 900 !important; background: var(--jf-surface) !important;
@@ -354,7 +352,15 @@ APP_JS = r"""
     ['schedule', 'unplaced'].forEach((kind) => {
       const details = query(`#jf-${kind}-details`);
       const body = query(`#jf-${kind}-details-body`);
-      if (details && body) body.classList.toggle('jf-details-expanded', details.open);
+      const summary = details?.querySelector('summary');
+      if (details && body && summary) {
+        details.setAttribute('aria-owns', body.id);
+        summary.setAttribute('aria-controls', body.id);
+        summary.setAttribute('aria-expanded', String(details.open));
+        body.setAttribute('role', 'region');
+        body.setAttribute('aria-labelledby', summary.id);
+        body.toggleAttribute('hidden', !details.open);
+      }
     });
     const open = panel.classList.contains('open');
     const mobile = window.matchMedia('(max-width: 700px)').matches;
@@ -432,11 +438,6 @@ APP_JS = r"""
       }
     }
   });
-  appRoot.addEventListener('toggle', (event) => {
-    const details = event.target;
-    const body = query(`#${details.id}-body`);
-    if (body) body.classList.toggle('jf-details-expanded', details.open);
-  }, true);
   const observer = new MutationObserver(sync);
   observer.observe(appRoot, {
     subtree: true,
@@ -600,7 +601,8 @@ def _details_markup(kind: str, count: int) -> str:
         raise ValueError("unknown details kind")
     return (
         f'<details id="{element_id}" class="jf-secondary">'
-        f"<summary>{label} ({count})</summary></details>"
+        f'<summary id="{element_id}-summary" aria-controls="{element_id}-body">'
+        f"{label} ({count})</summary></details>"
     )
 
 

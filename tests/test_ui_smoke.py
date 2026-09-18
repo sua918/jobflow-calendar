@@ -118,6 +118,14 @@ def test_calendar_first_removes_hero_summary_boxes_and_starts_details_closed() -
     assert "통계" not in labels
     assert '<details id="jf-schedule-details" class="jf-secondary">' in html_config
     assert '<details id="jf-unplaced-details" class="jf-secondary">' in html_config
+    assert (
+        '<summary id="jf-schedule-details-summary" '
+        'aria-controls="jf-schedule-details-body">' in html_config
+    )
+    assert (
+        '<summary id="jf-unplaced-details-summary" '
+        'aria-controls="jf-unplaced-details-body">' in html_config
+    )
     assert '<details id="jf-schedule-details" class="jf-secondary" open' not in html_config
     assert '<details id="jf-unplaced-details" class="jf-secondary" open' not in html_config
 
@@ -364,11 +372,13 @@ def test_secondary_disclosure_markup_includes_result_counts_and_starts_closed() 
 
     assert schedule == (
         '<details id="jf-schedule-details" class="jf-secondary">'
-        "<summary>상세 일정 (13)</summary></details>"
+        '<summary id="jf-schedule-details-summary" '
+        'aria-controls="jf-schedule-details-body">상세 일정 (13)</summary></details>'
     )
     assert unplaced == (
         '<details id="jf-unplaced-details" class="jf-secondary">'
-        "<summary>미배치 및 진단 (2)</summary></details>"
+        '<summary id="jf-unplaced-details-summary" '
+        'aria-controls="jf-unplaced-details-body">미배치 및 진단 (2)</summary></details>'
     )
     assert " open" not in schedule
     assert " open" not in unplaced
