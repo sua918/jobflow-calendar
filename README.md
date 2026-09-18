@@ -1,5 +1,7 @@
 # JobFlow
 
+> **Migration status:** this README documents the reviewed rolling-plan implementation at baseline `767fc1ac4a4ae38351cfb925ec29eb91ef2162ef`. All `2주`/`14일` statements below are historical baseline behavior, not the normative target. The approved selected-calendar-month contract and downstream migration requirements are in `docs/architecture.md`; frontend implementation will update this README after the backend month schema is approved.
+
 JobFlow는 한국어로 입력한 취업 준비 작업을 편집 가능한 구조로 검토한 뒤, 2주 동안의 충돌 없는 `규칙 기반 일정`으로 배치하는 로컬 Gradio MVP입니다.
 
 ## 무엇을 하나요
