@@ -22,6 +22,7 @@ CALENDAR_FIRST_TOKENS = {
     "text": "#18181B",
     "textMuted": "#52525B",
     "border": "#D4D4D8",
+    "borderStrong": "#71717A",
     "focus": "#1D4ED8",
     "deadlineSoft": "#EFF6FF",
     "routineSoft": "#ECFDF5",
@@ -80,6 +81,37 @@ def test_required_text_and_surface_pairs_meet_wcag_aa() -> None:
         name: _contrast(*colors)
         for name, colors in pairs.items()
         if _contrast(*colors) < 4.5
+    }
+
+    assert failures == {}
+
+
+def test_required_focus_and_component_boundaries_meet_three_to_one() -> None:
+    component_boundary_pairs = {
+        "control-on-surface": ("#71717A", "#FFFFFF"),
+        "control-on-subtle": ("#71717A", "#FAFAFA"),
+        "control-on-canvas": ("#71717A", "#F7F8FA"),
+    }
+    focus_surfaces = {
+        "surface": "#FFFFFF",
+        "surface-subtle": "#FAFAFA",
+        "canvas": "#F7F8FA",
+        "interaction-soft": "#EFF6FF",
+        "routine-soft": "#ECFDF5",
+        "fixed-soft": "#FFFBEB",
+        "danger-soft": "#FEF3F2",
+        "today-soft": "#DBEAFE",
+        "disabled": "#F4F4F5",
+    }
+    pairs = component_boundary_pairs | {
+        f"focus-on-{name}": ("#1D4ED8", surface)
+        for name, surface in focus_surfaces.items()
+    }
+
+    failures = {
+        name: _contrast(*colors)
+        for name, colors in pairs.items()
+        if _contrast(*colors) < 3.0
     }
 
     assert failures == {}

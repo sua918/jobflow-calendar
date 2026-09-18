@@ -12,7 +12,7 @@ colors:
   text: "#18181B"
   textMuted: "#52525B"
   border: "#D4D4D8"
-  borderStrong: "#A1A1AA"
+  borderStrong: "#71717A"
   focus: "#1D4ED8"
   disabled: "#F4F4F5"
   disabledText: "#52525B"
@@ -194,12 +194,13 @@ Pretendard is preferred when installed; core usability must not depend on a remo
 ## Colors
 
 - Canvas is `#F7F8FA`; primary surfaces are white; structural lines use `#D4D4D8`.
+- `border` (`#D4D4D8`) is decorative only: use it for separators, the calendar shell, and non-interactive table rules where a visible component boundary is not required. `borderStrong` (`#71717A`) is the interactive/component-boundary token and is required for unfilled inputs, secondary buttons, checkboxes/radios, and other controls whose shape is otherwise not identifiable. On its permitted adjacent surfaces (`surface`, `surfaceSubtle`, and `canvas`) it meets at least 3:1. Do not place `borderStrong` on a semantic soft surface without rechecking contrast.
 - Main text is charcoal `#18181B`; secondary text is `#52525B`. Never use low-opacity gray for essential text.
 - `#2563EB` is the only general interaction accent. Reserve it for the primary action, selected/focus states, links, and today/selection emphasis.
 - Schedule category color is semantic and subdued. Deadline, routine, and fixed events use pale surfaces plus a 3 px left border, visible icon, and Korean category text. Never use a large saturated fill and never encode category by color alone.
 - Error and unplaced states use `#B42318` text or border on `#FEF3F2`, always with an icon/label and deterministic message.
 - Warning/partial states use `#92400E` on `#FFFBEB`; today uses `#1E3A8A` on `#DBEAFE`; outside-month text uses `#71717A` on the subtle surface; disabled controls use `#52525B` on `#F4F4F5`; loading placeholders use solid `#E4E4E7` without a gradient.
-- Text/background pairs must meet WCAG 2.1 AA: 4.5:1 for normal text and 3:1 for large text. Focus and component boundaries must meet 3:1 against adjacent colors.
+- Text/background pairs must meet WCAG 2.1 AA: 4.5:1 for normal text and 3:1 for large text. The `focus` token must meet 3:1 against every surface on which it is normatively used. Required control boundaries use `borderStrong` and must meet 3:1 against their adjacent `surface`, `surfaceSubtle`, or `canvas`; low-contrast `border` lines are decorative and must never be the sole visual boundary of a control or state.
 
 ## Typography
 
@@ -222,7 +223,7 @@ At 1440×1000:
 - gap below top bar: 16 px;
 - calendar workspace: at least 824 px high and at least 70% of visible workspace area;
 - calendar toolbar: 56 px; weekday row: 36 px; six-row month cells: at least 112 px high; five-row months grow to use available height;
-- closed right panel consumes no layout width; open panel is 440 px wide and overlays the calendar with a scrim rather than shrinking it.
+- closed right panel consumes no layout width; open panel is 440 px wide and overlays the calendar without a scrim and without shrinking it. The desktop calendar remains available to pointer and keyboard users.
 
 At 390×844:
 
@@ -230,13 +231,13 @@ At 390×844:
 - product identity, month label, previous/next controls, and primary action fit in two compact rows totaling at most 104 px;
 - calendar/agenda starts no lower than 116 px and uses the remaining viewport;
 - month grid becomes a chronological selected-month agenda below 700 px; event-free dates and adjacent-month dates are omitted;
-- open composition panel is a full-width sheet (`100dvw`, maximum 390 px) with its own vertical scroll; underlying calendar scroll is locked.
+- open composition panel is a full-viewport sheet (`position: fixed; inset: 0; width: 100dvw; max-width: none; height: 100dvh`) throughout the `max-width: 700px` breakpoint, with its own vertical scroll; underlying calendar scroll is locked. At the 390 px acceptance viewport its measured width is 390±2 px; at 391–700 px it continues to equal the viewport width rather than remaining capped at 390 px.
 
 The document itself must never scroll horizontally. Data tables may scroll inside their own panel region, but the default calendar/result surface must not.
 
 ## Elevation & Depth
 
-Use borders before shadows. The top bar has a 1 px bottom border. The calendar has one 1 px border and no card-within-card treatment. The open side panel may use `-8px 0 24px rgba(24, 24, 27, 0.10)`; no other large shadow is allowed. Event chips and collapsed disclosures have no shadow.
+Use borders before shadows. The top bar has a 1 px decorative `border` bottom edge. The calendar has one 1 px decorative `border` and no card-within-card treatment. Interactive controls that need a visible boundary use `borderStrong`. The open side panel may use `-8px 0 24px rgba(24, 24, 27, 0.10)`; no other large shadow is allowed. Event chips and collapsed disclosures have no shadow.
 
 ## Shapes
 
@@ -244,7 +245,7 @@ Use borders before shadows. The top bar has a 1 px bottom border. The calendar h
 - Calendar shell: 12 px radius; day cells have no individual radius.
 - Event chips: 6 px radius with a 3 px semantic left border.
 - Status badge only: 999 px pill.
-- Borders are 1 px. Do not surround every section with a card border.
+- Borders are 1 px. Decorative separators use `border`; control boundaries use `borderStrong`. Do not surround every section with a card border.
 
 Exact component states: secondary hover uses `surfaceSubtle`; selected uses `primarySoft` plus a blue structural marker; today, outside-month, disabled, warning, error, and loading use the named token pairs above. Focus-visible always uses `focus`. Disabled and outside-month content remains readable and is additionally communicated by native state or structure.
 
@@ -270,7 +271,7 @@ Desktop uses a Monday-first seven-column month grid with 35 or 42 cells. Show at
 
 ### Composition panel
 
-Use Gradio 6.27's native `gr.Sidebar(position="right", width=440, open=False)` as the drawer primitive, with owned ID `jf-compose-panel`. It is closed on first load. The primary action opens it at step 1; scheduling success closes it and returns focus to the primary action/calendar heading. Do not invent a second desktop form column.
+Use Gradio 6.27's native `gr.Sidebar(position="right", width=440, open=False)` as the drawer primitive, with owned ID `jf-compose-panel`. It is closed on first load. On desktop it is a non-modal complementary region: render no scrim, do not set `aria-modal`, and do not make the calendar inert; pointer and keyboard interaction with the visible calendar remain available. The explicit close button and Escape dismiss it and restore the opening trigger. The primary action opens it at step 1; scheduling success closes it and returns focus to the primary action/calendar heading. Do not invent a second desktop form column.
 
 The panel has a sticky 56 px header, explicit close button, stepper, one scrollable body, and sticky 64 px footer. Only one step's primary content is expanded:
 

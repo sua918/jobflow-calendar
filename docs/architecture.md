@@ -375,24 +375,15 @@ class CalendarMonthView(BaseModel):
 
 ### 8.2 Visual system and accessibility gate
 
-The downstream frontend phase must add one tracked root `DESIGN.md` (or an equivalent single-source token specification if the tool proves incompatible) before styling implementation. It defines palette, typography, spacing, radii, focus treatment, interaction states, and calendar components. Validate it with `npx -y @google/design.md lint DESIGN.md`; if that CLI is unavailable, use an automated equivalent that checks token references and WCAG 2.1 AA contrast, and record the substitution.
+The tracked root [`DESIGN.md`](../DESIGN.md) is the single normative visual-token specification. Its current calendar-first palette, typography, spacing, radii, focus treatment, interaction states, and component-boundary rules supersede every earlier palette value from this architecture's planning history; implementations must not use the former `#0F172A` / `#4F46E5` / Okabe–Ito base as an alternative contract. Validate the root specification with `npx -y @google/design.md lint DESIGN.md` and the repository contrast tests. Decorative divider tokens and required interactive/component-boundary tokens are intentionally distinct; only the latter may provide a control's sole visible boundary.
 
-The visual direction is a calm, professional productivity/calendar interface inspired by established calendar and dashboard systems. It must not be a dark developer dashboard or use generic AI gradients. The normative accessible base is:
-
-- neutral ink `#0F172A` on white (`17.85:1` stated contrast);
-- primary indigo `#4F46E5` with white text (`6.29:1` stated contrast);
-- deadline: Okabe–Ito blue border `#0072B2`, pale blue surface `#E6F4FB`, dark ink text;
-- routine: Okabe–Ito green border `#009E73`, pale green surface `#E7F6F1`, dark ink text;
-- fixed event: Okabe–Ito orange border `#E69F00`, pale amber surface `#FFF4D6`, and dark ink text; the border is decorative unless separately proven accessible for text/icon use;
-- warning/unscheduled: vermillion border `#D55E00`, pale surface `#FDECE7`, dark ink text.
-
-Dark ink on the specified pale surfaces has stated contrast `15.58:1..16.29:1`. The implementation must re-run automated contrast checks rather than trusting prose values. Category meaning never relies on color alone: every chip pairs color with a visible label, icon, or pattern; QA verifies grayscale and common color-vision simulations remain distinguishable.
+Category meaning never relies on color alone: every chip pairs color with a visible label, icon, or pattern; QA verifies grayscale and common color-vision simulations remain distinguishable. Implementations must re-run automated contrast checks rather than trusting prose values.
 
 Required states are default, hover, keyboard focus-visible, selected, today, outside-month, disabled, error, and warning. Focus indicators must remain visible against every surface. Controls and event targets meet WCAG target-size guidance, support keyboard-only operation, and preserve meaningful reading order. The month grid is responsive at desktop and mobile widths, has no horizontal clipping, and keeps event text/readability usable rather than shrinking seven columns beyond recognition; a responsive agenda treatment is permitted on narrow screens if month navigation and date grouping remain clear. Frontend acceptance includes screenshot/visual verification at representative desktop and mobile widths.
 
 ### 8.3 Calendar-first presentation addendum
 
-The build-ready presentation contract is [`docs/calendar-first-ui.md`](calendar-first-ui.md), with normative tokens in the root [`DESIGN.md`](../DESIGN.md). It supersedes the earlier visual placement described in sections 8 and 8.2 without changing their domain, calendar projection, accessibility, or data-availability requirements.
+The build-ready presentation contract is [`docs/calendar-first-ui.md`](calendar-first-ui.md), with normative tokens in the root [`DESIGN.md`](../DESIGN.md). Together they supersede all earlier visual placement, palette, and visual-token prerequisites described in sections 8 and 8.2 without changing their domain, calendar projection, accessibility, or data-availability requirements.
 
 The default document is a persistent calendar workspace: a compact 64 px top bar, one high-emphasis `일정 만들기` action, and a full-width selected-month calendar directly beneath it. The request, editable review, and completion states move into a closed-by-default right `gr.Sidebar` flow (`요청 입력 → 일정 확인 → 캘린더`). The separate hero, standalone deterministic-summary box, standalone statistics box, and primary result tabs are removed. The same summary/statistics data becomes one compact calendar-toolbar live region; detailed schedule and exact unplaced diagnostics remain available in two independent disclosures below the calendar, both closed by default.
 

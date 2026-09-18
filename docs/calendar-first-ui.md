@@ -34,10 +34,10 @@ Adopt a persistent calendar workspace plus a right-side composition drawer.
 - The calendar is mounted immediately after the top bar and never moves behind the entire input/review flow.
 - `일정 만들기` opens a progressive drawer with exactly three steps: `요청 입력 → 일정 확인 → 캘린더`.
 - Use Gradio 6.27's available `gr.Sidebar(position="right", width=440, open=False)` primitive with `elem_id="jf-compose-panel"`; do not emulate a modal with an always-visible column.
-- The drawer is non-modal on desktop and an overlay sheet on mobile. Desktop users may still inspect the calendar while editing. Mobile locks underlying document scroll while the sheet is open.
+- The drawer is non-modal on desktop and a modal overlay sheet on mobile. Desktop renders no scrim: users may inspect and operate the visible calendar by pointer or keyboard while editing. Mobile uses a dimming scrim, makes the background inert, and locks underlying document scroll while the sheet is open.
 - Detailed schedule and unplaced diagnostics become independent collapsed disclosures below the calendar, not sibling primary tabs.
 
-Reasoning: the installed Gradio version provides a native collapsible Sidebar with expand/collapse events and a right position. It is more reliable than a custom dialog layered over Gradio portals. Its public API does not promise overlay/no-reflow or product focus restoration, so those are JobFlow-owned requirements rather than assumed framework behavior. On desktop, the rendered `#jf-compose-panel` root must be fixed to `top: 0; right: 0; bottom: 0`, width 440 px, and a product z-index above the workspace. Opening it must change the calendar bounding-box width and x-position by no more than 2 px. On mobile it is fixed at `inset: 0`, width `100dvw`. Use the Sidebar `open` state/events for visibility; target no generated hash class. The implementation must add focus behavior through the owned IDs in section 8 and prove all geometry in section 12.
+Reasoning: the installed Gradio version provides a native collapsible Sidebar with expand/collapse events and a right position. It is more reliable than a custom dialog layered over Gradio portals. Its public API does not promise overlay/no-reflow or product focus restoration, so those are JobFlow-owned requirements rather than assumed framework behavior. On desktop, the rendered `#jf-compose-panel` root must be fixed to `top: 0; right: 0; bottom: 0`, width 440 px, and a product z-index above the workspace. It has `role="complementary"`, `aria-labelledby` pointing to its heading, no `aria-modal`, no scrim, and no background `inert`/`aria-hidden`; opening it must change the calendar bounding-box width and x-position by no more than 2 px. On mobile (`max-width: 700px`) it becomes modal, is fixed at `inset: 0`, and uses `width: 100dvw; max-width: none; height: 100dvh`; its scrim intercepts background pointer input while inertness/focus containment block keyboard access. Use the Sidebar `open` state/events for visibility; target no generated hash class. The implementation must add focus behavior through the owned IDs in section 8 and prove all geometry in section 12.
 
 ## 3. Information architecture
 
@@ -76,7 +76,7 @@ calendar remains mounted       ┌───────────────�
                                 └──────────────────────────┘
 ```
 
-The drawer owns the workflow; the calendar owns the result. The stepper reports progress and is not free navigation to a step whose prerequisites are missing.
+The drawer owns the workflow; the calendar owns the result. The stepper reports progress and is not free navigation to a step whose prerequisites are missing. This diagram has no desktop scrim: the visible calendar region to the left remains pointer- and keyboard-operable. Only the mobile sheet adds an intercepting dim scrim and modal background inertness.
 
 ## 4. Before/after component mapping
 
@@ -160,7 +160,7 @@ No other high-emphasis action appears while the drawer is closed.
 
 ### 6.2 Open drawer/sheet
 
-- Width: `100dvw`, max-width 390 px; height: `100dvh`.
+- At every viewport up to and including 700 px: `position: fixed; inset: 0; width: 100dvw; max-width: none; height: 100dvh`. The sheet therefore measures 390±2 px at the 390 px target and exactly follows viewport widths from 391 through 700 px.
 - Header: 56 px; stepper: 40 px; footer: 64 px; body owns the remaining scroll area.
 - Underlying document is inert for pointer/keyboard interaction and its scroll position is preserved.
 - All controls have 44×44 px minimum target areas; the visual checkbox/radio itself remains 18×18 px.
@@ -230,8 +230,8 @@ Closed workspace focus order:
 Drawer behavior:
 
 - Opening stores the trigger and moves focus to the drawer heading, then the first invalid control if reopening after validation.
-- Desktop Sidebar is non-modal: focus may leave it for the calendar, but the close control is always first inside and the panel has `aria-labelledby`.
-- Mobile sheet is modal in behavior: background receives `inert` and `aria-hidden="true"`; Tab/Shift+Tab remain within the sheet.
+- Desktop Sidebar is non-modal: it has `role="complementary"` and `aria-labelledby`, but no `aria-modal`, scrim, background `inert`, or background `aria-hidden`. Focus may leave it for the calendar, and visible calendar controls remain pointer-operable; the close control is always first inside.
+- Mobile sheet is modal in behavior: a dim scrim intercepts background pointer input, the background receives `inert` and `aria-hidden="true"`, and Tab/Shift+Tab remain within the sheet.
 - Escape closes the drawer unless an owned nested disclosure/editor is consuming Escape. Closing returns focus to the original `일정 만들기` trigger.
 - Step changes move focus to the new step heading, not the first table cell.
 - Scheduling completion is announced once through `aria-live="polite"`; errors use `role="alert"`. Do not duplicate announcements in separate summary and stats inputs.
@@ -347,8 +347,8 @@ Tests must inspect a real browser after the canonical keyless flow, not only sea
 | Font | computed `.jf-app` font family starts with `Pretendard` or `"Pretendard Variable"`; browser fallback list contains system options; no remote font required | same |
 | Overflow | `documentElement.scrollWidth === documentElement.clientWidth`; calendar itself does not clip focus ring | same; drawer table may internally scroll |
 | Primary action | exactly one visible primary/high-emphasis action while drawer closed | same |
-| Drawer default/focus | closed at load; opening focuses heading; Escape closes and restores trigger | full-width sheet; background inert; Tab contained |
-| Drawer no-reflow | opening changes calendar x/width by ≤2 px; owned fixed panel is 440±2 px wide | sheet is 390±2 px wide and fixed to viewport |
+| Drawer default/focus | closed at load; opening focuses heading; no scrim/`aria-modal`/background inertness; calendar remains pointer/keyboard available; Escape closes and restores trigger | full-width modal sheet; intercepting scrim; background inert; Tab contained |
+| Drawer no-reflow | opening changes calendar x/width by ≤2 px; owned fixed panel is 440±2 px wide | at 390 px, sheet is 390±2 px wide and fixed to viewport; at every tested 391–700 px width, sheet width equals `documentElement.clientWidth` ±2 px |
 | Calendar state stability | empty/loading/error/success outer shell dimensions differ by no more than 2 px at same viewport/month | same agenda container rule |
 | Event semantics | visible category icon/text plus subdued left border; escaped title; stable source/view IDs | same |
 | WCAG | all normative text/background pairs AA; focus/component indicators ≥3:1; keyboard order matches section 8 | same |
